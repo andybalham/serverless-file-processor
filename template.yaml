@@ -1,9 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  lambda-base
+  serverless-file-processing
 
-  Example SAM Template for lambda-base
+  SAM Template for serverless-file-processing
   
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
@@ -15,23 +15,58 @@ Globals:
 Parameters:
   ApplicationName:
     Type: String
-    Default: lambda-base
+    Default: serverless-file-processing
   ApiStageName:
     Type: String
     Default: dev
 
 Resources:
-  HelloWorldFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+
+  UnprocessedFileQueue:
+    Type: AWS::SQS::Queue
     Properties:
-      FunctionName: !Sub ${ApplicationName}-HelloWorldFunction
+      QueueName: !Sub ${ApplicationName}-unprocessed-file-queue
+
+  UnprocessedFileQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties: 
+      Queues: 
+        - !Ref UnprocessedFileQueue
+      PolicyDocument: 
+        Statement: 
+          - 
+            Action: 
+              - "SQS:SendMessage" 
+            Effect: "Allow"
+            Resource: !GetAtt UnprocessedFileQueue.Arn
+            Principal:  
+              Service: s3.amazonaws.com
+
+  FileBucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Sub ${ApplicationName}-file-bucket
+      NotificationConfiguration:
+        QueueConfigurations:
+        - Event: 's3:ObjectCreated:*'
+          Queue: !GetAtt UnprocessedFileQueue.Arn
+
+  FileProcessingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-file-processing-function
       Handler: lambda.handle
       # Environment:
       #   Variables:
+      #     RESPONSE_TOPIC: !Ref TargetFunctionResponseTopic
       # Policies:
-      # Events:
+      #   - SNSPublishMessagePolicy:
+      #       TopicName: !GetAtt TargetFunctionResponseTopic.TopicName
+      Events:
+        UnprocessedFileEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt UnprocessedFileQueue.Arn
+            BatchSize: 10
+            Enabled: true
 
-Outputs:
-  HelloWorldFunctionARN:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
