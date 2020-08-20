@@ -42,6 +42,11 @@ Resources:
             Principal:  
               Service: s3.amazonaws.com
 
+  UnprocessedUpdateQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${ApplicationName}-unprocessed-update-queue
+
   FileBucket:
     Type: AWS::S3::Bucket
     Properties: 
@@ -56,12 +61,14 @@ Resources:
     Properties:
       FunctionName: !Sub ${ApplicationName}-file-processing-function
       Handler: lambda.handle
-      # Environment:
-      #   Variables:
-      #     RESPONSE_TOPIC: !Ref TargetFunctionResponseTopic
-      # Policies:
-      #   - SNSPublishMessagePolicy:
-      #       TopicName: !GetAtt TargetFunctionResponseTopic.TopicName
+      Environment:
+        Variables:
+          UNPROCESSED_UPDATE_QUEUE_URL: !Ref UnprocessedUpdateQueue
+      Policies:
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt UnprocessedUpdateQueue.QueueName
+        - S3ReadPolicy:
+            BucketName: !Ref FileBucket
       Events:
         UnprocessedFileEvent:
           Type: SQS
