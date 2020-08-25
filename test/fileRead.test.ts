@@ -1,6 +1,6 @@
 import { createReadStream } from 'fs';
-import readline from 'linebyline';
 import { processFileStream } from '../src/lambda';
+import { expect } from 'chai';
 
 describe('File reading', () => {
 
@@ -27,45 +27,22 @@ describe('File reading', () => {
         console.log('Program Ended');
     });
 
-    it('can read file', async () => {
-
-        const readerStream = createReadStream('.\\test\\testData.txt');
-
-        const rl = readline(readerStream);
-
-        const myReadPromise = new Promise((resolve, reject) => {
-
-            rl.on('line', (line) => {
-                console.log(`Line from file: ${line}`);
-            });
-
-            rl.on('error', (err) => {
-                console.log('error');
-                reject(err);
-            });
-
-            rl.on('close', function () {
-                console.log('closed');
-                resolve();
-            });
-        });
-
-        try { 
-            await myReadPromise; 
-        }
-        catch(err) {
-            console.log('an error has occurred');
-        }
-    
-        console.log('done reading!');        
-    });
-
     it.only('can read file', async () => {
 
         const readerStream = createReadStream('.\\test\\testData.txt');
 
-        processFileStream(readerStream);
-    
-        console.log('done reading!');        
+        let actualHeader = '';
+        const actualLineGroups = new Array<Array<string>>();
+
+        const handleLines = async (header: string, lines: string[]): Promise<void> => {
+            actualHeader = header;
+            actualLineGroups.push(lines);
+            console.log(`Pushed lines: ${lines.length}`);
+        };
+
+        await processFileStream(readerStream, handleLines);
+
+        expect(actualHeader).to.equal('Header|Alternative Firm Name|20200416|1905|');
+        expect(actualLineGroups.length).to.equal(4);
     });
 });

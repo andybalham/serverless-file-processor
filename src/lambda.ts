@@ -1,9 +1,9 @@
-import readline from 'linebyline';
-import { SQS, S3 } from 'aws-sdk';
+import readline from 'readline';
+import { S3 } from 'aws-sdk';
 import { Readable } from 'stream';
 import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { S3Event } from 'aws-lambda';
-import { SendMessageRequest } from 'aws-sdk/clients/sqs';
+import SQS, { SendMessageRequest } from 'aws-sdk/clients/sqs';
 
 const s3Client = new S3;
 const sqsClient = new SQS;
@@ -18,6 +18,25 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         const s3Event = JSON.parse(sqsEventRecord.body) as S3Event | TestEvent;
         
+        const handleFirmLines = async (fileHeaderLine: string, firmLines: string[]): Promise<void> => {
+
+            const message = {
+                fileHeader: fileHeaderLine,
+                firmLines: firmLines
+            };
+
+            const params: SendMessageRequest = {
+                MessageBody: JSON.stringify(message),
+                QueueUrl: process.env.UNPROCESSED_UPDATE_QUEUE_URL ?? 'undefined'
+            };
+
+            // console.log(`Would have sent: ${JSON.stringify(params)}`);
+
+            const result = await sqsClient.sendMessage(params).promise();
+
+            console.log(`result: ${JSON.stringify(result)}`);    
+        };
+
         if ('Records' in s3Event) {
             
             for (let s3EventRecordIndex = 0; s3EventRecordIndex < s3Event.Records.length; s3EventRecordIndex++) {
@@ -38,7 +57,9 @@ export const handle = async (event: SQSEvent): Promise<any> => {
                 
                     const s3ReadStream = s3Client.getObject(params).createReadStream();
 
-                    await processFileStream(s3ReadStream, sqsClient);
+                    await processFileStream(s3ReadStream, handleFirmLines);
+                                                        
+                    console.log('Processed file stream');
 
                 } else {
                     console.warn(`Unexpected eventName: ${s3EventRecord.eventName}`);
@@ -57,43 +78,105 @@ class TestEvent {
     Event: string
 }
 
-export async function processFileStream(readerStream: Readable, sqsClient: SQS): Promise<void> {
+export async function processFileStream(readerStream: Readable, handleLineGroup: (fileHeaderLine: string, lineGroup: string[]) => Promise<void>): Promise<void> {
 
-    const rl = readline(readerStream);
+    let fileHeaderLine = '';
+    let currentLineKey: string | null = null;
+    let currentLineGroup = new Array<string>();
 
-    const myReadPromise = new Promise((resolve, reject) => {
+    const getLineKey = (line: string): string => {
+        return line.slice(0, line.indexOf('|'));
+    };
 
-        rl.on('line', async (line: string) => {
+    // TODO 25Aug20: Consider
 
-            const message = {
-                fileType: 'TestFileType',
-                lines: [ line ]
-            };
+    // try {
+    //     const rl = createInterface({
+    //       input: createReadStream('big-file.txt'),
+    //       crlfDelay: Infinity
+    //     });
 
-            const params: SendMessageRequest = {
-                MessageBody: JSON.stringify(message),
-                QueueUrl: process.env.UNPROCESSED_UPDATE_QUEUE_URL ?? 'undefined'
-            };
-    
-            const result = await sqsClient.sendMessage(params).promise();
+    //     rl.on('line', (line) => {
+    //       // Process the line.
+    //     });
 
-            console.log(`result: ${JSON.stringify(result)}`);            
-            console.log(`Line from file: ${line}`);
+    //     await once(rl, 'close');
+
+    //     console.log('File processed.');
+    //   } catch (err) {
+    //     console.error(err);
+    //   }
+
+    const readFileAsync = new Promise((resolve, reject) => {
+
+        const lineReader = readline
+            .createInterface({
+                input: readerStream,
+                terminal: false
+            });
+
+        lineReader.on('line', async (line: string) => {
+
+            const lineKey = getLineKey(line);
+
+            console.log(line);
+
+            if (lineKey === 'Header') {
+
+                fileHeaderLine = line;
+                
+            } else {
+
+                if (lineKey === currentLineKey) {
+
+                    currentLineGroup.push(line);
+
+                } else {
+
+                    const previousLineGroup = currentLineGroup;
+
+                    currentLineKey = lineKey;
+                    currentLineGroup = [line];
+
+                    if (previousLineGroup.length > 0) {
+                        await handleLineGroup(fileHeaderLine, previousLineGroup);
+                    }
+                }
+            }
         });
 
-        rl.on('error', (err) => {
-            console.log('error');
-            reject(err);
-        });
+        lineReader.on('close', async () => {
 
-        rl.on('close', function () {
             console.log('closed');
+
+            if (currentLineGroup.length > 0) {
+                await handleLineGroup(fileHeaderLine, currentLineGroup);
+            }
+    
             resolve();
         });
     });
 
-    try { 
-        await myReadPromise; 
+    // const readFileAsync = new Promise(resolve => {
+
+    //     const lineReader = readline
+    //         .createInterface({
+    //             input: readerStream,
+    //             terminal: false
+    //         });
+
+    //     lineReader.on('line', (line: string) => {
+    //         console.log(line);
+    //     });
+
+    //     lineReader.on('close', () => {
+    //         console.log('closed');
+    //         resolve();
+    //     });
+    // });
+
+    try {
+        await readFileAsync;
     }
     catch(err) {
         console.log('an error has occurred');
