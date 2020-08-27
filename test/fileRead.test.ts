@@ -27,22 +27,30 @@ describe('File reading', () => {
         console.log('Program Ended');
     });
 
-    it.only('can read file', async () => {
+    [
+        { filePath: '.\\test\\data\\master.ext', expectedHeader: 'Header|Firms Master List|20200416|1905|', expectedGroupCount: 20},
+        { filePath: '.\\test\\data\\names.ext', expectedHeader: 'Header|Alternative Firm Name|20200416|1905|', expectedGroupCount: 6},
+        { filePath: '.\\test\\data\\permission.ext', expectedHeader: 'Header|Firm Permission|20200416|1905|', expectedGroupCount: 3},
+        { filePath: '.\\test\\data\\app_reps.ext', expectedHeader: 'Header|Appointment|20200416|1905|', expectedGroupCount: 5},
+    ].forEach(theory => {
 
-        const readerStream = createReadStream('.\\test\\testData.txt');
+        it.only(`can read ${theory.filePath}`, async () => {
 
-        let actualHeader = '';
-        const actualLineGroups = new Array<Array<string>>();
-
-        const handleLines = async (header: string, lines: string[]): Promise<void> => {
-            actualHeader = header;
-            actualLineGroups.push(lines);
-            console.log(`Pushed lines: ${lines.length}`);
-        };
-
-        await processFileStream(readerStream, handleLines);
-
-        expect(actualHeader).to.equal('Header|Alternative Firm Name|20200416|1905|');
-        expect(actualLineGroups.length).to.equal(4);
+            const readerStream = createReadStream(theory.filePath);
+    
+            let actualHeader = '';
+            const actualLineGroups = new Array<Array<string>>();
+    
+            const handleLines = async (header: string, lines: string[]): Promise<void> => {
+                actualHeader = header;
+                actualLineGroups.push(lines);
+                console.log(`Pushed lines: ${lines.length}, first: ${lines[0]}`);
+            };
+    
+            await processFileStream(readerStream, handleLines);
+    
+            expect(actualHeader).to.equal(theory.expectedHeader);
+            expect(actualLineGroups.length).to.equal(theory.expectedGroupCount);
+        });    
     });
 });

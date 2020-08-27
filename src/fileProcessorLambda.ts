@@ -18,11 +18,11 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         const s3Event = JSON.parse(sqsEventRecord.body) as S3Event | TestEvent;
         
-        const handleFirmLines = async (fileHeaderLine: string, firmLines: string[]): Promise<void> => {
+        const handleUpdate = async (fileHeaderLine: string, updateLines: string[]): Promise<void> => {
 
             const message = {
                 fileHeader: fileHeaderLine,
-                firmLines: firmLines
+                updateLines: updateLines
             };
 
             const params: SendMessageRequest = {
@@ -30,7 +30,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
                 QueueUrl: process.env.UNPROCESSED_UPDATE_QUEUE_URL ?? 'undefined'
             };
 
-            // console.log(`Would have sent: ${JSON.stringify(params)}`);
+            console.log(`Sending: ${JSON.stringify(params)}`);
 
             const result = await sqsClient.sendMessage(params).promise();
 
@@ -57,7 +57,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
                 
                     const s3ReadStream = s3Client.getObject(params).createReadStream();
 
-                    await processFileStream(s3ReadStream, handleFirmLines);
+                    await processFileStream(s3ReadStream, handleUpdate);
                                                         
                     console.log('Processed file stream');
 
@@ -80,12 +80,20 @@ class TestEvent {
 
 export async function processFileStream(readerStream: Readable, handleLineGroup: (fileHeaderLine: string, lineGroup: string[]) => Promise<void>): Promise<void> {
 
+    let fileType = '';
     let fileHeaderLine = '';
     let currentLineKey: string | null = null;
     let currentLineGroup = new Array<string>();
 
-    const getLineKey = (line: string): string => {
-        return line.slice(0, line.indexOf('|'));
+    const getLineKey = (line: string): string | null => {
+        
+        let keyEndIndex = line.indexOf('|');
+
+        if (fileType === 'Appointment') {
+            keyEndIndex = line.indexOf('|', keyEndIndex + 1);
+        }
+
+        return keyEndIndex !== -1 ? line.slice(0, keyEndIndex) : null;
     };
 
     // TODO 25Aug20: Consider
@@ -119,13 +127,13 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
 
             const lineKey = getLineKey(line);
 
-            console.log(line);
+            if (line.startsWith('Header')) {
 
-            if (lineKey === 'Header') {
-
+                const fileTypeMatch = line.match(/^[^|]+[|](?<fileType>[^|]+)/);
+                fileType = fileTypeMatch?.groups?.fileType ?? '';
                 fileHeaderLine = line;
                 
-            } else {
+            } else if ((lineKey !== null) && !lineKey.startsWith('Footer')) {
 
                 if (lineKey === currentLineKey) {
 
