@@ -56,11 +56,11 @@ Resources:
         - Event: 's3:ObjectCreated:*'
           Queue: !GetAtt UnprocessedFileQueue.Arn
 
-  FileProcessingFunction:
+  FileProcessorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub ${ApplicationName}-file-processing-function
-      Handler: lambda.handle
+      FunctionName: !Sub ${ApplicationName}-file-processor-function
+      Handler: fileProcessorLambda.handle
       Environment:
         Variables:
           UNPROCESSED_UPDATE_QUEUE_URL: !Ref UnprocessedUpdateQueue
@@ -74,6 +74,19 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt UnprocessedFileQueue.Arn
+            BatchSize: 10
+            Enabled: true
+
+  UpdateProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-update-processor-function
+      Handler: updateProcessorLambda.handle
+      Events:
+        UnprocessedUpdateEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt UnprocessedUpdateQueue.Arn
             BatchSize: 10
             Enabled: true
 

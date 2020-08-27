@@ -157,24 +157,6 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
         });
     });
 
-    // const readFileAsync = new Promise(resolve => {
-
-    //     const lineReader = readline
-    //         .createInterface({
-    //             input: readerStream,
-    //             terminal: false
-    //         });
-
-    //     lineReader.on('line', (line: string) => {
-    //         console.log(line);
-    //     });
-
-    //     lineReader.on('close', () => {
-    //         console.log('closed');
-    //         resolve();
-    //     });
-    // });
-
     try {
         await readFileAsync;
     }

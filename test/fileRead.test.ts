@@ -1,5 +1,5 @@
 import { createReadStream } from 'fs';
-import { processFileStream } from '../src/lambda';
+import { processFileStream } from '../src/fileProcessorLambda';
 import { expect } from 'chai';
 
 describe('File reading', () => {
