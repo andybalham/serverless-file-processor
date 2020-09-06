@@ -2,6 +2,8 @@
     "cSpell.language": "en-GB",
     "cSpell.words": [
         "ESNEXT",
+        "SKIPTONFINANCIALSERVICESLTD",
+        "Skipton",
         "downlevel",
         "linebreak",
         "sourcemap",
@@ -14,6 +16,15 @@
     },
     "cSpell.ignoreWords": [
         "linebyline",
-        "somefile"
+        "moneytree",
+        "northernfinancialservicesltd",
+        "saffrondirect",
+        "saffroninsure",
+        "saffronmoneytree",
+        "somefile",
+        "tumeric",
+        "tumericdirect",
+        "tumericinsure",
+        "tumericmoneytree"
     ]
 }
