@@ -2,6 +2,7 @@ import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { UpdateMessage } from './UpdateMessage';
 import { FileType } from './FileType';
 import { DatabaseItem, FirmAuthorisationDatabaseItem, AlternativeFirmNamesDatabaseItem, AlternativeFirmName, FirmPermissionsDatabaseItem, FirmPermission, FirmAppointedRepresentativeDatabaseItem, FirmPrincipalDatabaseItem } from './DatabaseItems';
+import DynamoDB from 'aws-sdk/clients/dynamodb';
 
 export const handle = async (event: SQSEvent): Promise<any> => {
 
@@ -13,16 +14,32 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         const updateMessage: UpdateMessage = JSON.parse(sqsEventRecord.body);
 
-        await processUpdateMessage(updateMessage, async (databaseItems) => {
-            // TODO 05Sep20: Actually process the update items
-            console.log(`databaseItems: ${JSON.stringify(databaseItems)}`);
-        });
+        await processUpdateMessage(updateMessage, updateDatabase);
 
         console.log(`sqsEventRecord: ${JSON.stringify(sqsEventRecord)}`);
     }
     
     console.log('Exiting');
 };
+
+const dynamoDbClient = new DynamoDB.DocumentClient();
+
+async function updateDatabase(databaseItems: DatabaseItem[]): Promise<void> {
+
+    for (let index = 0; index < databaseItems.length; index++) {
+        
+        const databaseItem = databaseItems[index];
+
+        const params: any = {
+            TableName: process.env.TARGET_TABLE_NAME,
+            Item: databaseItem
+        };
+    
+        await dynamoDbClient.put(params).promise();
+    }
+    
+    // console.log(`databaseItems: ${JSON.stringify(databaseItems)}`);
+}
 
 export async function processUpdateMessage(updateMessage: UpdateMessage, updater: (databaseItems: DatabaseItem[]) => Promise<void>): Promise<void> {    
     const databaseItems = getDatabaseItems(updateMessage);

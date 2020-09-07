@@ -17,6 +17,13 @@ Parameters:
   ApiStageName:
     Type: String
     Default: dev
+  UpdateProcessorRoleArn:
+    Type: String
+  TargetTableName:
+    Type: String
+  EnableSQS:
+    Type: String
+    AllowedValues: [true, false]
 
 Resources:
 
@@ -75,18 +82,22 @@ Resources:
           Properties:
             Queue: !GetAtt UnprocessedFileQueue.Arn
             BatchSize: 10
-            Enabled: false
+            Enabled: !Ref EnableSQS
 
   UpdateProcessorFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub ${ApplicationName}-update-processor-function
       Handler: updateProcessorLambda.handle
+      Role: !Ref UpdateProcessorRoleArn
+      Environment:
+        Variables:
+          TARGET_TABLE_NAME: !Ref TargetTableName
       Events:
         UnprocessedUpdateEvent:
           Type: SQS
           Properties:
             Queue: !GetAtt UnprocessedUpdateQueue.Arn
             BatchSize: 10
-            Enabled: false
+            Enabled: !Ref EnableSQS
 
