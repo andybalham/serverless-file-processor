@@ -33,7 +33,7 @@ describe('File reading', () => {
     [
         { filePath: '.\\test\\data\\master.ext', expectedHeader: 'Header|Firms Master List|20200416|1905|', expectedGroupCount: 20},
         { filePath: '.\\test\\data\\names.ext', expectedHeader: 'Header|Alternative Firm Name|20200416|1905|', expectedGroupCount: 6},
-        { filePath: '.\\test\\data\\permission.ext', expectedHeader: 'Header|Firm Permission|20200416|1905|', expectedGroupCount: 3},
+        { filePath: '.\\test\\data\\permission.ext', expectedHeader: 'Header|Firm Permission|20200416|1905|', expectedGroupCount: 37},
         { filePath: '.\\test\\data\\app_reps.ext', expectedHeader: 'Header|Appointment|20200416|1905|', expectedGroupCount: 5},
     ].forEach(theory => {
 
@@ -143,17 +143,16 @@ describe('File reading', () => {
         const expectedItems: FirmPermissionsDatabaseItem[] = [
             {
                 firmReference: '100013',
-                itemType: 'RegulatedActivityPermissions',
+                itemType: 'RegulatedActivityPermissions-14',
+                regulatedActivityCode: '14',
                 permissions: [
                     {
-                        regulatedActivityCode: '14',
                         investmentTypeCode: undefined,
                         customerTypeCode: undefined,
                         statusCode: '4',
                         effectiveDate: '2001-12-01'
                     },
                     {
-                        regulatedActivityCode: '14',
                         investmentTypeCode: '6',
                         customerTypeCode: '5',
                         statusCode: '4',

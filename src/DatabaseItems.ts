@@ -27,11 +27,11 @@ export class AlternativeFirmName {
 }
 
 export class FirmPermissionsDatabaseItem extends DatabaseItem {
+    regulatedActivityCode: string;
     permissions: FirmPermission[]
 }
 
 export class FirmPermission {
-    regulatedActivityCode: string;
     investmentTypeCode?: string;
     customerTypeCode?: string;
     statusCode: string;

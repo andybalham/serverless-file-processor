@@ -90,7 +90,8 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
         
         let keyEndIndex = line.indexOf('|');
 
-        if (fileType === 'Appointment') {
+        if ((fileType === 'Appointment')
+            || (fileType === 'Firm Permission')) {
             keyEndIndex = line.indexOf('|', keyEndIndex + 1);
         }
 

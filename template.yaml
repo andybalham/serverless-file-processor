@@ -24,6 +24,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub ${ApplicationName}-unprocessed-file-queue
+      ReceiveMessageWaitTimeSeconds: 20
 
   UnprocessedFileQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -44,6 +45,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub ${ApplicationName}-unprocessed-update-queue
+      ReceiveMessageWaitTimeSeconds: 20
 
   FileBucket:
     Type: AWS::S3::Bucket
@@ -73,7 +75,7 @@ Resources:
           Properties:
             Queue: !GetAtt UnprocessedFileQueue.Arn
             BatchSize: 10
-            Enabled: true
+            Enabled: false
 
   UpdateProcessorFunction:
     Type: AWS::Serverless::Function
@@ -86,5 +88,5 @@ Resources:
           Properties:
             Queue: !GetAtt UnprocessedUpdateQueue.Arn
             BatchSize: 10
-            Enabled: true
+            Enabled: false
 

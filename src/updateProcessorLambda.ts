@@ -91,7 +91,6 @@ function getFirmPermissionDatabaseItems(dataValuesArray: string[][]): FirmPermis
     const getFirmPermissions = (dataValuesArray: string[][]): FirmPermission[] => 
         dataValuesArray.map(firmPermissionValues => {
             return {
-                regulatedActivityCode: firmPermissionValues[1],
                 investmentTypeCode: getStringItemValue(firmPermissionValues[2]),
                 customerTypeCode: getStringItemValue(firmPermissionValues[3]),
                 statusCode: firmPermissionValues[4],
@@ -101,7 +100,8 @@ function getFirmPermissionDatabaseItems(dataValuesArray: string[][]): FirmPermis
 
     const firmPermissionsDatabaseItem: FirmPermissionsDatabaseItem = {
         firmReference: dataValuesArray[0][0],
-        itemType: 'RegulatedActivityPermissions',
+        itemType: `RegulatedActivityPermissions-${dataValuesArray[0][1]}`,
+        regulatedActivityCode: dataValuesArray[0][1],
         permissions: getFirmPermissions(dataValuesArray)
     };
 
