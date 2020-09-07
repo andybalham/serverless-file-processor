@@ -19,11 +19,14 @@ Parameters:
     Default: dev
   UpdateProcessorRoleArn:
     Type: String
+    Default: arn:aws:iam::361728023653:role/serverless-file-processing-table-item-role
   TargetTableName:
     Type: String
+    Default: serverless-file-processing-table
   EnableSQS:
     Type: String
     AllowedValues: [true, false]
+    Default: true
 
 Resources:
 
@@ -32,6 +35,7 @@ Resources:
     Properties:
       QueueName: !Sub ${ApplicationName}-unprocessed-file-queue
       ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 360
 
   UnprocessedFileQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -53,6 +57,7 @@ Resources:
     Properties:
       QueueName: !Sub ${ApplicationName}-unprocessed-update-queue
       ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 60
 
   FileBucket:
     Type: AWS::S3::Bucket
@@ -68,6 +73,7 @@ Resources:
     Properties:
       FunctionName: !Sub ${ApplicationName}-file-processor-function
       Handler: fileProcessorLambda.handle
+      Timeout: 60
       Environment:
         Variables:
           UNPROCESSED_UPDATE_QUEUE_URL: !Ref UnprocessedUpdateQueue
@@ -90,6 +96,7 @@ Resources:
       FunctionName: !Sub ${ApplicationName}-update-processor-function
       Handler: updateProcessorLambda.handle
       Role: !Ref UpdateProcessorRoleArn
+      Timeout: 10
       Environment:
         Variables:
           TARGET_TABLE_NAME: !Ref TargetTableName
