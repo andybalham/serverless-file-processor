@@ -86,7 +86,7 @@ function getAppointmentDatabaseItems(dataValuesArray: string[][]): Array<FirmApp
 
     const firmAppointedRepresentative: FirmAppointedRepresentativeDatabaseItem = {
         firmReference: appointmentDataValues[0],
-        itemType: `FirmAppointedRepresentative-${appointmentDataValues[1]}`,
+        itemType: `FirmPrincipal-${appointmentDataValues[1]}`,
         principalFirmRef: appointmentDataValues[1],
         statusCode: appointmentDataValues[2],
         statusEffectiveDate: getDateItemValue(appointmentDataValues[3]),
@@ -94,7 +94,7 @@ function getAppointmentDatabaseItems(dataValuesArray: string[][]): Array<FirmApp
 
     const firmPrincipal: FirmPrincipalDatabaseItem = {
         firmReference: appointmentDataValues[1],
-        itemType: `FirmPrincipal-${appointmentDataValues[0]}`,
+        itemType: `FirmAppointedRepresentative-${appointmentDataValues[0]}`,
         appointedRepresentativeFirmRef: appointmentDataValues[0],
         statusCode: firmAppointedRepresentative.statusCode,
         statusEffectiveDate: firmAppointedRepresentative.statusEffectiveDate,
