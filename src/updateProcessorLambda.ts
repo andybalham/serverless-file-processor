@@ -1,7 +1,7 @@
 import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { UpdateMessage } from './UpdateMessage';
 import { FileType } from './FileType';
-import { DatabaseItem, FirmAuthorisationDatabaseItem, AlternativeFirmNamesDatabaseItem, AlternativeFirmName, FirmPermissionsDatabaseItem, FirmPermission, FirmAppointedRepresentativeDatabaseItem, FirmPrincipalDatabaseItem } from './DatabaseItems';
+import { DatabaseItem, FirmAuthorisationDatabaseItem, AlternativeFirmNamesDatabaseItem, AlternativeFirmName, FirmPermissionsDatabaseItem, FirmPermission, FirmPrincipalDatabaseItem, FirmAppointedRepresentativeDatabaseItem } from './DatabaseItems';
 import DynamoDB from 'aws-sdk/clients/dynamodb';
 
 export const handle = async (event: SQSEvent): Promise<any> => {
@@ -80,11 +80,11 @@ function getDatabaseItems(updateMessage: UpdateMessage): DatabaseItem[] {
     return databaseItems;
 }
 
-function getAppointmentDatabaseItems(dataValuesArray: string[][]): Array<FirmAppointedRepresentativeDatabaseItem | FirmPrincipalDatabaseItem> {
+function getAppointmentDatabaseItems(dataValuesArray: string[][]): Array<FirmPrincipalDatabaseItem | FirmAppointedRepresentativeDatabaseItem> {
 
     const appointmentDataValues = dataValuesArray[0];
 
-    const firmAppointedRepresentative: FirmAppointedRepresentativeDatabaseItem = {
+    const firmAppointedRepresentative: FirmPrincipalDatabaseItem = {
         firmReference: appointmentDataValues[0],
         itemType: `FirmPrincipal-${appointmentDataValues[1]}`,
         principalFirmRef: appointmentDataValues[1],
@@ -92,7 +92,7 @@ function getAppointmentDatabaseItems(dataValuesArray: string[][]): Array<FirmApp
         statusEffectiveDate: getDateItemValue(appointmentDataValues[3]),
     };
 
-    const firmPrincipal: FirmPrincipalDatabaseItem = {
+    const firmPrincipal: FirmAppointedRepresentativeDatabaseItem = {
         firmReference: appointmentDataValues[1],
         itemType: `FirmAppointedRepresentative-${appointmentDataValues[0]}`,
         appointedRepresentativeFirmRef: appointmentDataValues[0],

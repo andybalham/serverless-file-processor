@@ -38,13 +38,13 @@ export class FirmPermission {
     effectiveDate: string;
 }
 
-export class FirmAppointedRepresentativeDatabaseItem extends DatabaseItem {
+export class FirmPrincipalDatabaseItem extends DatabaseItem {
     principalFirmRef: string;
     statusCode: string;
     statusEffectiveDate: string;
 }
 
-export class FirmPrincipalDatabaseItem extends DatabaseItem {
+export class FirmAppointedRepresentativeDatabaseItem extends DatabaseItem {
     appointedRepresentativeFirmRef: string;
     statusCode: string;
     statusEffectiveDate: string;
