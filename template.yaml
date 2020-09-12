@@ -39,6 +39,7 @@ Resources:
 
   UnprocessedFileQueuePolicy:
     Type: AWS::SQS::QueuePolicy
+    DependsOn: UnprocessedFileQueue
     Properties: 
       Queues: 
         - !Ref UnprocessedFileQueue
@@ -61,6 +62,7 @@ Resources:
 
   FileBucket:
     Type: AWS::S3::Bucket
+    DependsOn: UnprocessedFileQueue
     Properties: 
       BucketName: !Sub ${ApplicationName}-file-bucket
       NotificationConfiguration:
@@ -70,6 +72,10 @@ Resources:
 
   FileProcessorFunction:
     Type: AWS::Serverless::Function
+    DependsOn: 
+      - UnprocessedFileQueue
+      - FileBucket
+      - UnprocessedUpdateQueue
     Properties:
       FunctionName: !Sub ${ApplicationName}-file-processor-function
       Handler: fileProcessorLambda.handle
@@ -92,6 +98,9 @@ Resources:
 
   UpdateProcessorFunction:
     Type: AWS::Serverless::Function
+    DependsOn:
+      - UnprocessedUpdateQueue
+      # TODO The DynamoDb table too
     Properties:
       FunctionName: !Sub ${ApplicationName}-update-processor-function
       Handler: updateProcessorLambda.handle
