@@ -3,6 +3,7 @@ import { UpdateMessage } from './UpdateMessage';
 import { FileType } from './FileType';
 import { DatabaseItem, FirmAuthorisationDatabaseItem, AlternativeFirmNamesDatabaseItem, AlternativeFirmName, FirmPermissionsDatabaseItem, FirmPermission, FirmPrincipalDatabaseItem, FirmAppointedRepresentativeDatabaseItem } from './DatabaseItems';
 import DynamoDB from 'aws-sdk/clients/dynamodb';
+import { parseLine } from './parsing';
 
 export const handle = async (event: SQSEvent): Promise<any> => {
 
@@ -48,27 +49,28 @@ export async function processUpdateMessage(updateMessage: UpdateMessage, updater
 
 function getDatabaseItems(updateMessage: UpdateMessage): DatabaseItem[] {
     
-    const fileType = updateMessage.headerLine.split('|')[1];
-    const dataValuesArray = updateMessage.dataLines.map(line => line.split('|'));
+    const fileType = updateMessage.headerLine.split('|')[1] as FileType;
+
+    // TODO 12Sep20: How can we reject the message if we are not able to process it?
 
     let databaseItems: DatabaseItem[];
 
     switch (fileType) {
 
     case FileType.FirmsMasterList:
-        databaseItems = getFirmsMasterListDatabaseItems(dataValuesArray);
+        databaseItems = getFirmsMasterListDatabaseItems(updateMessage);
         break;
     
     case FileType.AlternativeFirmName:
-        databaseItems = getAlternativeFirmNameDatabaseItems(dataValuesArray);
+        databaseItems = getAlternativeFirmNameDatabaseItems(updateMessage);
         break;
     
     case FileType.FirmPermission:
-        databaseItems = getFirmPermissionDatabaseItems(dataValuesArray);
+        databaseItems = getFirmPermissionDatabaseItems(updateMessage);
         break;
     
     case FileType.Appointment:
-        databaseItems = getAppointmentDatabaseItems(dataValuesArray);
+        databaseItems = getAppointmentDatabaseItems(updateMessage);
         break;
                 
     default:
@@ -80,7 +82,9 @@ function getDatabaseItems(updateMessage: UpdateMessage): DatabaseItem[] {
     return databaseItems;
 }
 
-function getAppointmentDatabaseItems(dataValuesArray: string[][]): Array<FirmPrincipalDatabaseItem | FirmAppointedRepresentativeDatabaseItem> {
+function getAppointmentDatabaseItems(updateMessage: UpdateMessage): Array<FirmPrincipalDatabaseItem | FirmAppointedRepresentativeDatabaseItem> {
+
+    const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 9));
 
     const appointmentDataValues = dataValuesArray[0];
 
@@ -103,7 +107,9 @@ function getAppointmentDatabaseItems(dataValuesArray: string[][]): Array<FirmPri
     return [firmAppointedRepresentative, firmPrincipal];
 }
 
-function getFirmPermissionDatabaseItems(dataValuesArray: string[][]): FirmPermissionsDatabaseItem[] {
+function getFirmPermissionDatabaseItems(updateMessage: UpdateMessage): FirmPermissionsDatabaseItem[] {
+
+    const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 8));
 
     const getFirmPermissions = (dataValuesArray: string[][]): FirmPermission[] => 
         dataValuesArray.map(firmPermissionValues => {
@@ -125,7 +131,9 @@ function getFirmPermissionDatabaseItems(dataValuesArray: string[][]): FirmPermis
     return [firmPermissionsDatabaseItem];
 }
 
-function getAlternativeFirmNameDatabaseItems(dataValuesArray: string[][]): AlternativeFirmNamesDatabaseItem[] {
+function getAlternativeFirmNameDatabaseItems(updateMessage: UpdateMessage): AlternativeFirmNamesDatabaseItem[] {
+
+    const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 8));
 
     const getAlternativeNames = (dataValuesArray: string[][]): AlternativeFirmName[] => 
         dataValuesArray.map(alternativeNameValues => {
@@ -154,7 +162,9 @@ function getOptionalDateItemValue(dateString: string): string | undefined {
     return (dateString === '') ? undefined : getDateItemValue(dateString);
 }
 
-function getFirmsMasterListDatabaseItems(dataValuesArray: string[][]): FirmAuthorisationDatabaseItem[] {
+function getFirmsMasterListDatabaseItems(updateMessage: UpdateMessage): FirmAuthorisationDatabaseItem[] {
+
+    const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 29));
 
     const firmAuthorisationValues = dataValuesArray[0];
 

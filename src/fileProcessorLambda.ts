@@ -5,6 +5,8 @@ import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { S3Event } from 'aws-lambda';
 import SQS, { SendMessageRequest } from 'aws-sdk/clients/sqs';
 import { UpdateMessage } from './UpdateMessage';
+import { parseLine } from './parsing';
+import { FileType } from './FileType';
 
 const s3Client = new S3;
 const sqsClient = new SQS;
@@ -81,21 +83,19 @@ class TestEvent {
 
 export async function processFileStream(readerStream: Readable, handleLineGroup: (fileHeaderLine: string, lineGroup: string[]) => Promise<void>): Promise<void> {
 
-    let fileType = '';
+    let fileType: FileType | undefined = undefined;
     let fileHeaderLine = '';
     let currentLineKey: string | null = null;
     let currentLineGroup = new Array<string>();
 
-    const getLineKey = (line: string): string | null => {
-        
-        let keyEndIndex = line.indexOf('|');
-
-        if ((fileType === 'Appointment')
-            || (fileType === 'Firm Permission')) {
-            keyEndIndex = line.indexOf('|', keyEndIndex + 1);
+    const getLineKey = (lineParts: string[]): string | null => {        
+        switch (fileType) {
+        case FileType.Appointment:
+        case FileType.FirmPermission:
+            return `${lineParts[0]}|${lineParts[1]}`;
+        default:
+            return lineParts[0];
         }
-
-        return keyEndIndex !== -1 ? line.slice(0, keyEndIndex) : null;
     };
 
     // TODO 25Aug20: Consider
@@ -127,30 +127,33 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
 
         lineReader.on('line', async (line: string) => {
 
-            const lineKey = getLineKey(line);
+            const lineParts = parseLine(line);
 
-            if (line.startsWith('Header')) {
-
-                const fileTypeMatch = line.match(/^[^|]+[|](?<fileType>[^|]+)/);
-                fileType = fileTypeMatch?.groups?.fileType ?? '';
+            if (lineParts[0] === 'Header') {
+                fileType = lineParts[1] as FileType;
                 fileHeaderLine = line;
-                
-            } else if ((lineKey !== null) && !lineKey.startsWith('Footer')) {
+                return;                
+            }
 
-                if (lineKey === currentLineKey) {
+            if (lineParts[0] === 'Footer') {
+                return;                
+            }
 
-                    currentLineGroup.push(line);
+            const lineKey = getLineKey(lineParts);
 
-                } else {
+            if (lineKey === currentLineKey) {
 
-                    const previousLineGroup = currentLineGroup;
+                currentLineGroup.push(line);
 
-                    currentLineKey = lineKey;
-                    currentLineGroup = [line];
+            } else {
 
-                    if (previousLineGroup.length > 0) {
-                        await handleLineGroup(fileHeaderLine, previousLineGroup);
-                    }
+                const previousLineGroup = currentLineGroup;
+
+                currentLineKey = lineKey;
+                currentLineGroup = [line];
+
+                if (previousLineGroup.length > 0) {
+                    await handleLineGroup(fileHeaderLine, previousLineGroup);
                 }
             }
         });

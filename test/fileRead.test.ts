@@ -4,6 +4,7 @@ import { processUpdateMessage } from '../src/updateProcessorLambda';
 import { expect } from 'chai';
 import { UpdateMessage } from '../src/UpdateMessage';
 import { DatabaseItem, FirmAuthorisationDatabaseItem, AlternativeFirmNamesDatabaseItem, FirmPermissionsDatabaseItem, FirmAppointedRepresentativeDatabaseItem, FirmPrincipalDatabaseItem } from '../src/DatabaseItems';
+import { parseLine } from '../src/parsing';
 
 describe('File reading', () => {
 
@@ -34,7 +35,7 @@ describe('File reading', () => {
         { filePath: '.\\test\\data\\master.ext', expectedHeader: 'Header|Firms Master List|20200416|1905|', expectedGroupCount: 20},
         { filePath: '.\\test\\data\\names.ext', expectedHeader: 'Header|Alternative Firm Name|20200416|1905|', expectedGroupCount: 6},
         { filePath: '.\\test\\data\\permission.ext', expectedHeader: 'Header|Firm Permission|20200416|1905|', expectedGroupCount: 37},
-        { filePath: '.\\test\\data\\app_reps.ext', expectedHeader: 'Header|Appointment|20200416|1905|', expectedGroupCount: 5},
+        { filePath: '.\\test\\data\\app_reps.ext', expectedHeader: 'Header|Appointment|20200416|1905|', expectedGroupCount: 10},
     ].forEach(theory => {
 
         it(`can read ${theory.filePath}`, async () => {
@@ -183,14 +184,14 @@ describe('File reading', () => {
         const expectedItems: Array<FirmAppointedRepresentativeDatabaseItem | FirmPrincipalDatabaseItem> = [
             {
                 firmReference: '100014',
-                itemType: 'FirmAppointedRepresentative-117659',
+                itemType: 'FirmPrincipal-117659',
                 principalFirmRef: '117659',
                 statusCode: 'Withdrawn',
                 statusEffectiveDate: '2001-12-01'
             },
             {
                 firmReference: '117659',
-                itemType: 'FirmPrincipal-100014',
+                itemType: 'FirmAppointedRepresentative-100014',
                 appointedRepresentativeFirmRef: '100014',
                 statusCode: 'Withdrawn',
                 statusEffectiveDate: '2001-12-01'
@@ -205,4 +206,17 @@ describe('File reading', () => {
 
         expect(actualItems).to.deep.equal(expectedItems);
     });
+
+    [
+        { expectedParts: ['1', '2', '3'], line: '1|2|3'},
+        { expectedParts: ['1', '2 "or" two', '3'], line: '1|2 "or" two|3'},
+        { expectedParts: ['1', '2 || two', '3'], line: '1|"2 || two"|3'},
+    ].forEach(theory => {
+        it(`can parse lines with pipes and quotes (${JSON.stringify(theory)})`, () => {
+        
+            const actualParts = parseLine(theory.line, theory.expectedParts.length);
+
+            expect(actualParts).to.deep.equal(theory.expectedParts);
+        });    
+    });    
 });
