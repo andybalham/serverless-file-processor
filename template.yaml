@@ -30,6 +30,19 @@ Parameters:
 
 Resources:
 
+  LookupTable:    
+    Type: TODO
+    
+  FileBucket:
+    Type: AWS::S3::Bucket
+    DependsOn: UnprocessedFileQueue
+    Properties: 
+      BucketName: !Sub ${ApplicationName}-file-bucket
+      NotificationConfiguration:
+        QueueConfigurations:
+        - Event: 's3:ObjectCreated:*'
+          Queue: !GetAtt UnprocessedFileQueue.Arn
+
   UnprocessedFileQueue:
     Type: AWS::SQS::Queue
     Properties:
@@ -59,16 +72,6 @@ Resources:
       QueueName: !Sub ${ApplicationName}-unprocessed-update-queue
       ReceiveMessageWaitTimeSeconds: 20
       VisibilityTimeout: 60
-
-  FileBucket:
-    Type: AWS::S3::Bucket
-    DependsOn: UnprocessedFileQueue
-    Properties: 
-      BucketName: !Sub ${ApplicationName}-file-bucket
-      NotificationConfiguration:
-        QueueConfigurations:
-        - Event: 's3:ObjectCreated:*'
-          Queue: !GetAtt UnprocessedFileQueue.Arn
 
   FileProcessorFunction:
     Type: AWS::Serverless::Function

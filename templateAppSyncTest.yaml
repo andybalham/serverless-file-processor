@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: appsync-test
+  
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Runtime: nodejs12.x
+    CodeUri: dist/
+    Timeout: 3
+  
+Parameters:
+  ApplicationName:
+    Type: String
+    Default: appsync-test
+  ApiStageName:
+    Type: String
+    Default: dev
+
+Resources:
+
+  LookupTable:    
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: !Sub ${ApplicationName}-lookup-table
+      ProvisionedThroughput: 
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions: 
+        - 
+          AttributeName: firmReference
+          AttributeType: S
+        - 
+          AttributeName: itemType
+          AttributeType: S
+      KeySchema: 
+        - 
+          AttributeName: firmReference
+          KeyType: HASH
+        - 
+          AttributeName: itemType
+          KeyType: RANGE
+
+  LookupTablePolicy:
+    Type: AWS::IAM::Policy
+    DependsOn: LookupTable
+    Properties:
+      PolicyName: !Sub ${ApplicationName}-lookup-table-policy
+
+  LookupApi:
+    Type: AWS::AppSync::GraphQLApi
+    DependsOn: LookupTable
+    Properties:
+      Name: !Sub ${ApplicationName}-appsync-api
+      AuthenticationType:  API_KEY    
