@@ -41,15 +41,44 @@ Resources:
           AttributeName: itemType
           KeyType: RANGE
 
-  LookupTablePolicy:
-    Type: AWS::IAM::Policy
+  UpdateProcessorLambdaRole:
+    Type: 'AWS::IAM::Role'
     DependsOn: LookupTable
     Properties:
-      PolicyName: !Sub ${ApplicationName}-lookup-table-policy
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+
+
+  LookupTablePolicy:
+    Type: AWS::IAM::Policy
+    DependsOn: LookupTableRole
+    Properties:
+      Roles:
+        - !Ref LookupTableRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:BatchGetItem,
+              - dynamodb:BatchWriteItem,
+              - dynamodb:ConditionCheckItem,
+              - dynamodb:PutItem,
+              - dynamodb:DeleteItem,
+              - dynamodb:GetItem,
+              - dynamodb:UpdateItem
+            Resource: !GetAtt LookupTable.Arn
 
   LookupApi:
     Type: AWS::AppSync::GraphQLApi
     DependsOn: LookupTable
     Properties:
       Name: !Sub ${ApplicationName}-appsync-api
-      AuthenticationType:  API_KEY    
+      AuthenticationType: API_KEY

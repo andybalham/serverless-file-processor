@@ -34,7 +34,7 @@
 
 * Try 1% of the volume
 
-* GSIs for iterating in a sorted manner
+* GSI usage for iterating in a sorted manner
   * [Is there a DynamoDB max partition size of 10GB for a single partition key value?](https://stackoverflow.com/questions/40272600/is-there-a-dynamodb-max-partition-size-of-10gb-for-a-single-partition-key-value#40277185)
   * Perhaps a better solution would be to have a separate table
 

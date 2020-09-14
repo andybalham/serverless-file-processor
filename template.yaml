@@ -17,21 +17,12 @@ Parameters:
   ApiStageName:
     Type: String
     Default: dev
-  UpdateProcessorRoleArn:
-    Type: String
-    Default: arn:aws:iam::361728023653:role/serverless-file-processing-table-item-role
-  TargetTableName:
-    Type: String
-    Default: serverless-file-processing-table
   EnableSQS:
     Type: String
     AllowedValues: [true, false]
     Default: true
 
 Resources:
-
-  LookupTable:    
-    Type: TODO
     
   FileBucket:
     Type: AWS::S3::Bucket
@@ -76,8 +67,8 @@ Resources:
   FileProcessorFunction:
     Type: AWS::Serverless::Function
     DependsOn: 
-      - UnprocessedFileQueue
       - FileBucket
+      - UnprocessedFileQueue
       - UnprocessedUpdateQueue
     Properties:
       FunctionName: !Sub ${ApplicationName}-file-processor-function
@@ -99,19 +90,45 @@ Resources:
             BatchSize: 10
             Enabled: !Ref EnableSQS
 
+  LookupTable:    
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: !Sub ${ApplicationName}-lookup-table
+      ProvisionedThroughput: 
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions: 
+        - 
+          AttributeName: firmReference
+          AttributeType: S
+        - 
+          AttributeName: itemType
+          AttributeType: S
+      KeySchema: 
+        - 
+          AttributeName: firmReference
+          KeyType: HASH
+        - 
+          AttributeName: itemType
+          KeyType: RANGE
+
   UpdateProcessorFunction:
     Type: AWS::Serverless::Function
     DependsOn:
       - UnprocessedUpdateQueue
-      # TODO The DynamoDb table too
+      - LookupTable
     Properties:
       FunctionName: !Sub ${ApplicationName}-update-processor-function
       Handler: updateProcessorLambda.handle
-      Role: !Ref UpdateProcessorRoleArn
       Timeout: 10
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !GetAtt UnprocessedUpdateQueue.QueueName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LookupTable
       Environment:
         Variables:
-          TARGET_TABLE_NAME: !Ref TargetTableName
+          TARGET_TABLE_NAME: !Ref LookupTable
       Events:
         UnprocessedUpdateEvent:
           Type: SQS
@@ -120,3 +137,94 @@ Resources:
             BatchSize: 10
             Enabled: !Ref EnableSQS
 
+  # AppSync-Example.yaml
+  # https://gist.github.com/adrianhall/50e9fdf08e7a7e52d3ab0f01467b72f7
+
+  LookupApiRole:
+    Type: AWS::IAM::Role
+    DependsOn: LookupTable
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - appsync.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub ${ApplicationName}-appsync-lookup-role
+          PolicyDocument:
+            Version: 2012-10-17
+            # TODO: Restrict the access
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                Resource: '*'
+
+  LookupApi:
+    Type: AWS::AppSync::GraphQLApi
+    DependsOn: LookupApiRole
+    Properties:
+      # TODO: The name is too long
+      Name: !Sub ${ApplicationName}-appsync-api
+      # TODO: How can we generate an API key
+      AuthenticationType: API_KEY
+
+  LookupDynamoDBTableDataSource:
+    Type: AWS::AppSync::DataSource
+    DependsOn:
+      - LookupApiRole
+      - LookupApi
+      - LookupTable
+    Properties:
+      ApiId: !GetAtt LookupApi.ApiId
+      Name: LookupDynamoDBTable
+      Type: AMAZON_DYNAMODB
+      ServiceRoleArn: !GetAtt LookupApiRole.Arn
+      DynamoDBConfig:
+        AwsRegion: !Sub ${AWS::Region}
+        TableName: !Ref LookupTable
+
+  LookupSchema:
+    Type: "AWS::AppSync::GraphQLSchema"
+    DependsOn: LookupApi
+    Properties:
+      ApiId: !GetAtt LookupApi.ApiId
+      Definition: |
+        type FirmAuthorisation {
+          registeredFirmName: String!
+          firmReference: String!
+          addressLine1: String
+          addressLine2: String
+          addressLine3: String
+          addressLine4: String
+          addressLine5: String
+          addressLine6: String
+          postcodeIn: String
+          postcodeOut: String
+          currentAuthorisationStatusCode: String
+        }
+        type Query {
+          getFirmAuthorisation(firmReference: String!): FirmAuthorisation
+        }
+
+  QueryGetFirmAuthorisationResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: LookupSchema
+    Properties:
+      ApiId: !GetAtt LookupApi.ApiId
+      TypeName: Query
+      FieldName: getFirmAuthorisation
+      DataSourceName: !GetAtt LookupDynamoDBTableDataSource.Name
+      RequestMappingTemplate: |
+        {
+            "version": "2017-02-28",
+            "operation": "GetItem",
+            "key": {
+                "firmReference": $util.dynamodb.toDynamoDBJson($ctx.args.firmReference),
+                "itemType": $util.dynamodb.toDynamoDBJson("FirmAuthorisation"),
+            }
+        }        
+      ResponseMappingTemplate: "$utils.toJson($ctx.result)"
