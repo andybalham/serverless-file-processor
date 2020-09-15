@@ -51,8 +51,8 @@ Resources:
         Statement: 
           - 
             Action: 
-              - "SQS:SendMessage" 
-            Effect: "Allow"
+              - SQS:SendMessage
+            Effect: Allow
             Resource: !GetAtt UnprocessedFileQueue.Arn
             Principal:  
               Service: s3.amazonaws.com
@@ -154,23 +154,30 @@ Resources:
             Action:
               - 'sts:AssumeRole'
       Policies:
-        - PolicyName: !Sub ${ApplicationName}-appsync-lookup-role
+        - PolicyName: !Sub ${ApplicationName}-appsync-lookup-policy
           PolicyDocument:
             Version: 2012-10-17
-            # TODO: Restrict the access
             Statement:
               - Effect: Allow
-                Action: '*'
-                Resource: '*'
+                Action: 
+                  - dynamodb:GetItem
+                  - dynamodb:Scan
+                  - dynamodb:Query
+                  - dynamodb:BatchGetItem
+                  - dynamodb:DescribeTable
+                Resource: !GetAtt LookupTable.Arn
 
   LookupApi:
     Type: AWS::AppSync::GraphQLApi
     DependsOn: LookupApiRole
     Properties:
-      # TODO: The name is too long
-      Name: !Sub ${ApplicationName}-appsync-api
-      # TODO: How can we generate an API key
+      Name: sfp-appsync-api
       AuthenticationType: API_KEY
+                
+  LookupApiKey:
+    Type: AWS::AppSync::ApiKey
+    Properties: 
+      ApiId: !GetAtt LookupApi.ApiId
 
   LookupDynamoDBTableDataSource:
     Type: AWS::AppSync::DataSource
@@ -188,7 +195,7 @@ Resources:
         TableName: !Ref LookupTable
 
   LookupSchema:
-    Type: "AWS::AppSync::GraphQLSchema"
+    Type: AWS::AppSync::GraphQLSchema
     DependsOn: LookupApi
     Properties:
       ApiId: !GetAtt LookupApi.ApiId
@@ -228,3 +235,13 @@ Resources:
             }
         }        
       ResponseMappingTemplate: "$utils.toJson($ctx.result)"
+
+Outputs:
+  
+  LookupApiUrl:
+    Description: Lookup API URL
+    Value: !GetAtt LookupApi.GraphQLUrl
+
+  LookupApiKey:
+    Description: Lookup API Key
+    Value: !GetAtt LookupApiKey.ApiKey
