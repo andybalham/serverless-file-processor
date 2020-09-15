@@ -84,6 +84,8 @@ describe('File reading', () => {
             }
         ];
 
+        expectedItems.forEach(i => i.itemHash = DatabaseItem.getItemHash(i));
+
         let actualItems: DatabaseItem[] | null = null;
 
         await processUpdateMessage(updateMessage, async (databaseItems) => {
@@ -121,6 +123,8 @@ describe('File reading', () => {
                 ]
             },
         ];
+
+        expectedItems.forEach(i => i.itemHash = DatabaseItem.getItemHash(i));
 
         let actualItems: DatabaseItem[] | null = null;
 
@@ -163,6 +167,8 @@ describe('File reading', () => {
             },
         ];
 
+        expectedItems.forEach(i => i.itemHash = DatabaseItem.getItemHash(i));
+
         let actualItems: DatabaseItem[] | null = null;
 
         await processUpdateMessage(updateMessage, async (databaseItems) => {
@@ -197,6 +203,8 @@ describe('File reading', () => {
                 statusEffectiveDate: '2001-12-01'
             },
         ];
+
+        expectedItems.forEach(i => i.itemHash = DatabaseItem.getItemHash(i));
 
         let actualItems: DatabaseItem[] | null = null;
 

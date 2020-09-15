@@ -2,19 +2,10 @@
 
 ## Next
 
-* Add table and access policy to the SAM template
-  * https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-managedpolicy.html
-  * https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-appsync-graphqlapi.html#cfn-appsync-graphqlapi-authenticationtype
-
-* Add a basic AppSync API to the SAM template
-  * [An example CloudFormation template for AWS AppSync](https://gist.github.com/adrianhall/50e9fdf08e7a7e52d3ab0f01467b72f7)
-
-## Future
-
-* Use transaction to update the principals / ARs
-  * [Amazon DynamoDB Transactions: How It Works](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis.html)
 * Use hash code to conditionally update the items
   * [Conditional Updates](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html#Expressions.ConditionExpressions.SimpleComparisons)
+
+## Future
 
 * Add versioning to the database items (e.g. \_v0 or should that be v0\_, see [Sort Key Design](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-sort-keys.html))
 * Implement optimistic locking of database items
@@ -44,3 +35,15 @@
 
 * Look at local AppSync development
   * [Developing and testing GraphQL APIs, Storage and Functions with Amplify Framework Local Mocking features](https://aws.amazon.com/blogs/mobile/amplify-framework-local-mocking/)
+
+## Done
+
+* Add table and access policy to the SAM template
+  * https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-managedpolicy.html
+  * https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-appsync-graphqlapi.html#cfn-appsync-graphqlapi-authenticationtype
+
+* Add a basic AppSync API to the SAM template
+  * [An example CloudFormation template for AWS AppSync](https://gist.github.com/adrianhall/50e9fdf08e7a7e52d3ab0f01467b72f7)
+
+* Use transaction to update the principals / ARs
+  * [Amazon DynamoDB Transactions: How It Works](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis.html)

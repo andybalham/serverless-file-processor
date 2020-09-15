@@ -27,17 +27,25 @@ const dynamoDbClient = new DynamoDB.DocumentClient();
 
 async function updateDatabase(databaseItems: DatabaseItem[]): Promise<void> {
 
-    for (let index = 0; index < databaseItems.length; index++) {
-        
-        const databaseItem = databaseItems[index];
+    // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#transactWrite-property
+    // https://www.alexdebrie.com/posts/dynamodb-transactions/
 
-        const params: any = {
-            TableName: process.env.TARGET_TABLE_NAME,
-            Item: databaseItem
+    if (process.env.TARGET_TABLE_NAME === undefined) throw new Error('process.env.TARGET_TABLE_NAME === undefined');
+
+    const transactItems = databaseItems.map(item => { 
+        return {
+            Put: {
+                TableName: process.env.TARGET_TABLE_NAME ?? '',
+                Item: item
+            }
         };
-    
-        await dynamoDbClient.put(params).promise();
-    }
+    });
+
+    const params = {
+        TransactItems: transactItems
+    };
+
+    await dynamoDbClient.transactWrite(params).promise();
     
     // console.log(`databaseItems: ${JSON.stringify(databaseItems)}`);
 }
@@ -96,6 +104,8 @@ function getAppointmentDatabaseItems(updateMessage: UpdateMessage): Array<FirmPr
         statusEffectiveDate: getDateItemValue(appointmentDataValues[3]),
     };
 
+    firmAppointedRepresentative.itemHash = DatabaseItem.getItemHash(firmAppointedRepresentative);
+
     const firmPrincipal: FirmAppointedRepresentativeDatabaseItem = {
         firmReference: appointmentDataValues[1],
         itemType: `FirmAppointedRepresentative-${appointmentDataValues[0]}`,
@@ -103,6 +113,8 @@ function getAppointmentDatabaseItems(updateMessage: UpdateMessage): Array<FirmPr
         statusCode: firmAppointedRepresentative.statusCode,
         statusEffectiveDate: firmAppointedRepresentative.statusEffectiveDate,
     };
+
+    firmPrincipal.itemHash = DatabaseItem.getItemHash(firmPrincipal);
 
     return [firmAppointedRepresentative, firmPrincipal];
 }
@@ -128,6 +140,8 @@ function getFirmPermissionDatabaseItems(updateMessage: UpdateMessage): FirmPermi
         permissions: getFirmPermissions(dataValuesArray)
     };
 
+    firmPermissionsDatabaseItem.itemHash = DatabaseItem.getItemHash(firmPermissionsDatabaseItem);
+
     return [firmPermissionsDatabaseItem];
 }
 
@@ -149,6 +163,8 @@ function getAlternativeFirmNameDatabaseItems(updateMessage: UpdateMessage): Alte
         itemType: 'AlternativeFirmNames',
         names: getAlternativeNames(dataValuesArray)
     };
+
+    alternativeNamesDatabaseItem.itemHash = DatabaseItem.getItemHash(alternativeNamesDatabaseItem);
 
     return [alternativeNamesDatabaseItem];
 }
@@ -182,6 +198,8 @@ function getFirmsMasterListDatabaseItems(updateMessage: UpdateMessage): FirmAuth
         postcodeOut: getStringItemValue(firmAuthorisationValues[12]),
         currentAuthorisationStatusCode: firmAuthorisationValues[19],
     };
+
+    firmAuthorisationDatabaseItem.itemHash = DatabaseItem.getItemHash(firmAuthorisationDatabaseItem);
 
     return [firmAuthorisationDatabaseItem];
 }

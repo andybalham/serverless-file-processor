@@ -1,6 +1,14 @@
+import hash from 'object-hash';
+
 export abstract class DatabaseItem {
+
     firmReference: string;
-    itemType: string;    
+    itemType: string;
+    itemHash?: string;
+
+    static getItemHash(item: DatabaseItem): string {
+        return hash(item, { unorderedArrays: true });
+    }
 }
 
 export class FirmAuthorisationDatabaseItem extends DatabaseItem {
