@@ -29,23 +29,47 @@ async function updateDatabase(databaseItems: DatabaseItem[]): Promise<void> {
 
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#transactWrite-property
     // https://www.alexdebrie.com/posts/dynamodb-transactions/
+    // https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html
 
     if (process.env.TARGET_TABLE_NAME === undefined) throw new Error('process.env.TARGET_TABLE_NAME === undefined');
 
-    const transactItems = databaseItems.map(item => { 
+    // TODO 16Sep20: Look to do this without a transaction when only ONE item
+
+    const putItems = databaseItems.map(item => { 
         return {
             Put: {
                 TableName: process.env.TARGET_TABLE_NAME ?? '',
-                Item: item
+                Item: item,
+                ConditionExpression: 'itemHash <> :itemHash',
+                ExpressionAttributeValues: { ':itemHash': item.itemHash},
+                ReturnValuesOnConditionCheckFailure: 'NONE'
             }
         };
     });
 
     const params = {
-        TransactItems: transactItems
+        TransactItems: putItems
     };
 
-    await dynamoDbClient.transactWrite(params).promise();
+    try {
+        
+        await dynamoDbClient.transactWrite(params).promise();
+
+    } catch (error) {
+        
+        if (error instanceof Error) {
+            
+            console.log(`error.message: ${error.message}`);
+
+            if (!error.message.includes('ConditionalCheckFailed')) {
+                console.error('TODO: How should we handle this error?');
+                // throw error;
+            }
+
+        } else {
+            throw error;
+        }
+    }
     
     // console.log(`databaseItems: ${JSON.stringify(databaseItems)}`);
 }

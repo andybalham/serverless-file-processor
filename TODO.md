@@ -2,16 +2,11 @@
 
 ## Next
 
-* Use hash code to conditionally update the items
-  * [Conditional Updates](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html#Expressions.ConditionExpressions.SimpleComparisons)
-
-## Future
-
-* Add versioning to the database items (e.g. \_v0 or should that be v0\_, see [Sort Key Design](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-sort-keys.html))
-* Implement optimistic locking of database items
+* Don't use transactions when only one update
 
 * Raise SNS events from table updates
   * [DynamoDB Streams and AWS Lambda Triggers](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html)
+
 * Turn SNS events into SQS jobs to:
   * Export to [Amazon Elasticsearch](https://docs.aws.amazon.com/elasticsearch-service/index.html) to do search by name and location
     * [Loading Streaming Data into Amazon ES from Amazon DynamoDB](https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-aws-integrations.html#es-aws-integrations-dynamodb-es)
@@ -19,6 +14,14 @@
     * Should this info be a separate db item?
     * We wouldn't want a separate event => infinite loop
     * How would we merge the db items in the API? E.g. FirmAuthorisation and FirmAuthorisation_Ext
+
+## Future
+
+* Store lambdas, schemas and resolvers in S3
+  * https://adamtheautomator.com/upload-local-files-aws-s3-aws-cli/
+
+* Add versioning to the database items (e.g. \_v0 or should that be v0\_, see [Sort Key Design](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-sort-keys.html))
+* Implement optimistic locking of database items
 
 * Add a priority update queue written to by GraphQL API
   * I.e. refresh permissions from the FCA
@@ -47,3 +50,6 @@
 
 * Use transaction to update the principals / ARs
   * [Amazon DynamoDB Transactions: How It Works](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis.html)
+
+* Use hash code to conditionally update the items
+  * [Conditional Updates](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html#Expressions.ConditionExpressions.SimpleComparisons)
