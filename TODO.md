@@ -2,18 +2,9 @@
 
 ## Next
 
-* Don't use transactions when only one update
-
-* Raise SNS events from table updates
-  * [DynamoDB Streams and AWS Lambda Triggers](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html)
-
-* Turn SNS events into SQS jobs to:
+* Turn SNS events into SQS jobs:
   * Export to [Amazon Elasticsearch](https://docs.aws.amazon.com/elasticsearch-service/index.html) to do search by name and location
     * [Loading Streaming Data into Amazon ES from Amazon DynamoDB](https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-aws-integrations.html#es-aws-integrations-dynamodb-es)
-  * Retrieve extra info from FCA API, i.e. website
-    * Should this info be a separate db item?
-    * We wouldn't want a separate event => infinite loop
-    * How would we merge the db items in the API? E.g. FirmAuthorisation and FirmAuthorisation_Ext
 
 ## Future
 
@@ -21,12 +12,24 @@
   * https://adamtheautomator.com/upload-local-files-aws-s3-aws-cli/
 
 * Add versioning to the database items (e.g. \_v0 or should that be v0\_, see [Sort Key Design](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-sort-keys.html))
+  * Have a second table just for historical data
+
+* Don't use transactions when only one update
+
+* Retrieve extra info from FCA API, i.e. website
+  * Should this info be a separate db item?
+  * We wouldn't want a separate event => infinite loop
+  * How would we merge the db items in the API? E.g. FirmAuthorisation and FirmAuthorisation_Ext
+
 * Implement optimistic locking of database items
+  * Q. Why would we want to do this? Is it just to say we have?
 
 * Add a priority update queue written to by GraphQL API
   * I.e. refresh permissions from the FCA
 
 * Try 1% of the volume
+
+* Create a circuit-breaker Lambda, that switches off another Lambda based on some criteria
 
 * GSI usage for iterating in a sorted manner
   * [Is there a DynamoDB max partition size of 10GB for a single partition key value?](https://stackoverflow.com/questions/40272600/is-there-a-dynamodb-max-partition-size-of-10gb-for-a-single-partition-key-value#40277185)
@@ -53,3 +56,7 @@
 
 * Use hash code to conditionally update the items
   * [Conditional Updates](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html#Expressions.ConditionExpressions.SimpleComparisons)
+
+* Hook lambda to table updates and raise SNS events
+  * [DynamoDB Streams and AWS Lambda Triggers](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html)
+  * https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-dynamodb-table.html#cfn-dynamodb-table-streamspecification

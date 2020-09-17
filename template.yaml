@@ -97,6 +97,8 @@ Resources:
       ProvisionedThroughput: 
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
+      StreamSpecification: 
+        StreamViewType: NEW_AND_OLD_IMAGES
       AttributeDefinitions: 
         - 
           AttributeName: firmReference
@@ -136,6 +138,30 @@ Resources:
             Queue: !GetAtt UnprocessedUpdateQueue.Arn
             BatchSize: 10
             Enabled: !Ref EnableSQS
+
+  EventProcessorFunction:
+    Type: AWS::Serverless::Function
+    DependsOn: 
+      - LookupTable
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-event-processor-function
+      Handler: eventProcessorLambda.handle
+      Timeout: 6
+      # Environment:
+      #   Variables:
+      #     UNPROCESSED_UPDATE_QUEUE_URL: !Ref UnprocessedUpdateQueue
+      Policies:
+        - DynamoDBStreamReadPolicy:
+            TableName: !Ref LookupTable
+            StreamName: "*"
+      Events:
+        DatabaseEvent:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt LookupTable.StreamArn
+            Enabled: !Ref EnableSQS
+            MaximumRetryAttempts: 0
+            StartingPosition: TRIM_HORIZON
 
   # AppSync-Example.yaml
   # https://gist.github.com/adrianhall/50e9fdf08e7a7e52d3ab0f01467b72f7
