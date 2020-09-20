@@ -4,7 +4,7 @@ import { Readable } from 'stream';
 import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { S3Event } from 'aws-lambda';
 import SQS, { SendMessageRequest } from 'aws-sdk/clients/sqs';
-import { UpdateMessage } from './UpdateMessage';
+import { FileUpdateMessage } from './FileUpdateMessage';
 import { parseLine } from './parsing';
 import { FileType } from './FileType';
 
@@ -23,7 +23,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
         
         const handleUpdate = async (fileHeaderLine: string, updateLines: string[]): Promise<void> => {
 
-            const message: UpdateMessage = {
+            const message: FileUpdateMessage = {
                 headerLine: fileHeaderLine,
                 dataLines: updateLines
             };

@@ -1,8 +1,8 @@
 import { createReadStream } from 'fs';
 import { processFileStream } from '../src/fileProcessorLambda';
-import { processUpdateMessage } from '../src/updateProcessorLambda';
+import { processUpdateMessage } from '../src/fileUpdateProcessorLambda';
 import { expect } from 'chai';
-import { UpdateMessage } from '../src/UpdateMessage';
+import { FileUpdateMessage } from '../src/FileUpdateMessage';
 import { DatabaseItem, FirmAuthorisationDatabaseItem, AlternativeFirmNamesDatabaseItem, FirmPermissionsDatabaseItem, FirmAppointedRepresentativeDatabaseItem, FirmPrincipalDatabaseItem } from '../src/DatabaseItems';
 import { parseLine } from '../src/parsing';
 
@@ -60,7 +60,7 @@ describe('File reading', () => {
 
     it('can process firm authorisation updates', async () => {
         
-        const updateMessage: UpdateMessage = {
+        const updateMessage: FileUpdateMessage = {
             headerLine: 'Header|Firms Master List|20200416|1905|',
             dataLines: [
                 '100425|Northern Financial Services Ltd|5|1|N|Northern Financial Services Ltd|The Square|||Northern|N Yorkshire|RD53|1XT|+44|-|1756705000||||Authorised|20011201|20011201|NORTHERNFINANCIALSERVICESLTD|20200226|02061788||||'
@@ -97,7 +97,7 @@ describe('File reading', () => {
 
     it('can process alternative name updates', async () => {
         
-        const updateMessage: UpdateMessage = {
+        const updateMessage: FileUpdateMessage = {
             headerLine: 'Header|Alternative Firm Name|20200416|1905|',
             dataLines: [
                 '100425|Tumeric Direct|2|20071101||TUMERICDIRECT|20071101|',
@@ -137,7 +137,7 @@ describe('File reading', () => {
 
     it('can process permission updates', async () => {
         
-        const updateMessage: UpdateMessage = {
+        const updateMessage: FileUpdateMessage = {
             headerLine: 'Header|Firm Permission|20200416|1905|',
             dataLines: [
                 '100013|14|||4|20011201|20011130|',
@@ -180,7 +180,7 @@ describe('File reading', () => {
 
     it('can process appointed representative updates', async () => {
         
-        const updateMessage: UpdateMessage = {
+        const updateMessage: FileUpdateMessage = {
             headerLine: 'Header|Appointment|20200416|1905|',
             dataLines: [
                 '100014|117659|Withdrawn|20011201|20021104|TRUE|FALSE|FALSE|',

@@ -6,6 +6,7 @@ Description: >
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
+    ReservedConcurrentExecutions: 10
     Runtime: nodejs12.x
     CodeUri: dist/
     Timeout: 3
@@ -57,10 +58,10 @@ Resources:
             Principal:  
               Service: s3.amazonaws.com
 
-  UnprocessedUpdateQueue:
+  UnprocessedFileUpdateQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: !Sub ${ApplicationName}-unprocessed-update-queue
+      QueueName: !Sub ${ApplicationName}-unprocessed-file-update-queue
       ReceiveMessageWaitTimeSeconds: 20
       VisibilityTimeout: 60
 
@@ -69,17 +70,17 @@ Resources:
     DependsOn: 
       - FileBucket
       - UnprocessedFileQueue
-      - UnprocessedUpdateQueue
+      - UnprocessedFileUpdateQueue
     Properties:
       FunctionName: !Sub ${ApplicationName}-file-processor-function
       Handler: fileProcessorLambda.handle
       Timeout: 60
       Environment:
         Variables:
-          UNPROCESSED_UPDATE_QUEUE_URL: !Ref UnprocessedUpdateQueue
+          UNPROCESSED_UPDATE_QUEUE_URL: !Ref UnprocessedFileUpdateQueue
       Policies:
         - SQSSendMessagePolicy:
-            QueueName: !GetAtt UnprocessedUpdateQueue.QueueName
+            QueueName: !GetAtt UnprocessedFileUpdateQueue.QueueName
         - S3ReadPolicy:
             BucketName: !Ref FileBucket
       Events:
@@ -114,18 +115,18 @@ Resources:
           AttributeName: itemType
           KeyType: RANGE
 
-  UpdateProcessorFunction:
+  FileUpdateProcessorFunction:
     Type: AWS::Serverless::Function
     DependsOn:
-      - UnprocessedUpdateQueue
+      - UnprocessedFileUpdateQueue
       - LookupTable
     Properties:
-      FunctionName: !Sub ${ApplicationName}-update-processor-function
-      Handler: updateProcessorLambda.handle
+      FunctionName: !Sub ${ApplicationName}-file-update-processor-function
+      Handler: fileUpdateProcessorLambda.handle
       Timeout: 10
       Policies:
         - SQSPollerPolicy:
-            QueueName: !GetAtt UnprocessedUpdateQueue.QueueName
+            QueueName: !GetAtt UnprocessedFileUpdateQueue.QueueName
         - DynamoDBCrudPolicy:
             TableName: !Ref LookupTable
       Environment:
@@ -135,25 +136,34 @@ Resources:
         UnprocessedUpdateEvent:
           Type: SQS
           Properties:
-            Queue: !GetAtt UnprocessedUpdateQueue.Arn
+            Queue: !GetAtt UnprocessedFileUpdateQueue.Arn
             BatchSize: 10
             Enabled: !Ref EnableSQS
 
-  EventProcessorFunction:
+  LookupTableEventTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: ${ApplicationName}-lookup-table-event-topic
+
+  LookupTableEventProcessorFunction:
     Type: AWS::Serverless::Function
     DependsOn: 
       - LookupTable
+      - LookupTableEventTopic
     Properties:
-      FunctionName: !Sub ${ApplicationName}-event-processor-function
-      Handler: eventProcessorLambda.handle
+      FunctionName: !Sub ${ApplicationName}-lookup-table-event-processor-function
+      Handler: lookupTableEventProcessorLambda.handle
       Timeout: 6
-      # Environment:
-      #   Variables:
-      #     UNPROCESSED_UPDATE_QUEUE_URL: !Ref UnprocessedUpdateQueue
+      Environment:
+        Variables:
+          LOOKUP_TABLE_EVENT_TOPIC: !Ref LookupTableEventTopic
       Policies:
         - DynamoDBStreamReadPolicy:
             TableName: !Ref LookupTable
             StreamName: "*"
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt LookupTableEventTopic.TopicName
       Events:
         DatabaseEvent:
           Type: DynamoDB
@@ -162,6 +172,88 @@ Resources:
             Enabled: !Ref EnableSQS
             MaximumRetryAttempts: 0
             StartingPosition: TRIM_HORIZON
+
+  IteratorUpdateQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${ApplicationName}-iterator-update-queue
+      ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 60
+
+  IteratorUpdateQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    DependsOn: IteratorUpdateQueue
+    Properties: 
+      Queues: 
+        - !Ref IteratorUpdateQueue
+      PolicyDocument: 
+        Statement: 
+          - 
+            Action: 
+              - SQS:SendMessage
+            Effect: Allow
+            Resource: !GetAtt IteratorUpdateQueue.Arn
+            Principal:  
+              Service: sns.amazonaws.com
+
+  IteratorUpdateQueueSubscription:
+    Type: AWS::SNS::Subscription
+    DependsOn: 
+      - LookupTableEventTopic
+      - IteratorUpdateQueue
+    Properties: 
+      Endpoint: !GetAtt IteratorUpdateQueue.Arn
+      FilterPolicy: 
+        EventName: [ INSERT ]
+      Protocol: sqs
+      TopicArn: !Ref LookupTableEventTopic
+
+  IteratorTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName: !Sub ${ApplicationName}-iterator-table
+      ProvisionedThroughput: 
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      AttributeDefinitions: 
+        - 
+          AttributeName: iteratorType
+          AttributeType: S
+        - 
+          AttributeName: sortKey
+          AttributeType: S
+      KeySchema: 
+        - 
+          AttributeName: iteratorType
+          KeyType: HASH
+        - 
+          AttributeName: sortKey
+          KeyType: RANGE
+
+  IteratorUpdateProcessorFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - IteratorUpdateQueue
+      - IteratorTable
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-iterator-update-processor-function
+      Handler: iteratorUpdateProcessorLambda.handle
+      Timeout: 10
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !GetAtt IteratorUpdateQueue.QueueName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref IteratorTable
+      Environment:
+        Variables:
+          TARGET_TABLE_NAME: !Ref IteratorTable
+      Events:
+        UnprocessedUpdateEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt IteratorUpdateQueue.Arn
+            BatchSize: 10
+            Enabled: !Ref EnableSQS
 
   # AppSync-Example.yaml
   # https://gist.github.com/adrianhall/50e9fdf08e7a7e52d3ab0f01467b72f7

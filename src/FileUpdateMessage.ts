@@ -1,4 +1,4 @@
-export class UpdateMessage {
+export class FileUpdateMessage {
     headerLine: string;
     dataLines: string[];
 }

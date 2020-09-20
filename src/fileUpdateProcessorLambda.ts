@@ -1,7 +1,7 @@
 import { SQSEvent } from 'aws-lambda/trigger/sqs';
-import { UpdateMessage } from './UpdateMessage';
+import { FileUpdateMessage } from './FileUpdateMessage';
 import { FileType } from './FileType';
-import { DatabaseItem, FirmAuthorisationDatabaseItem, AlternativeFirmNamesDatabaseItem, AlternativeFirmName, FirmPermissionsDatabaseItem, FirmPermission, FirmPrincipalDatabaseItem, FirmAppointedRepresentativeDatabaseItem } from './DatabaseItems';
+import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNamesLookupTableItem, AlternativeFirmName, FirmPermissionsLookupTableItem, FirmPermission, FirmPrincipalLookupTableItem, FirmAppointedRepresentativeLookupTableItem } from './LookupTableItems';
 import DynamoDB from 'aws-sdk/clients/dynamodb';
 import { parseLine } from './parsing';
 
@@ -13,7 +13,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
         
         const sqsEventRecord = event.Records[recordIndex];
 
-        const updateMessage: UpdateMessage = JSON.parse(sqsEventRecord.body);
+        const updateMessage: FileUpdateMessage = JSON.parse(sqsEventRecord.body);
 
         await processUpdateMessage(updateMessage, updateDatabase);
 
@@ -25,7 +25,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
 const dynamoDbClient = new DynamoDB.DocumentClient();
 
-async function updateDatabase(databaseItems: DatabaseItem[]): Promise<void> {
+async function updateDatabase(databaseItems: LookupTableItem[]): Promise<void> {
 
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#transactWrite-property
     // https://www.alexdebrie.com/posts/dynamodb-transactions/
@@ -33,8 +33,8 @@ async function updateDatabase(databaseItems: DatabaseItem[]): Promise<void> {
 
     if (process.env.TARGET_TABLE_NAME === undefined) throw new Error('process.env.TARGET_TABLE_NAME === undefined');
 
-    // TODO 16Sep20: Look to do this without a transaction when only ONE item
-
+    // TODO 19Sep20: Avoid using transactions for single updates
+    
     const putItems = databaseItems.map(item => { 
         return {
             Put: {
@@ -74,18 +74,18 @@ async function updateDatabase(databaseItems: DatabaseItem[]): Promise<void> {
     // console.log(`databaseItems: ${JSON.stringify(databaseItems)}`);
 }
 
-export async function processUpdateMessage(updateMessage: UpdateMessage, updater: (databaseItems: DatabaseItem[]) => Promise<void>): Promise<void> {    
+export async function processUpdateMessage(updateMessage: FileUpdateMessage, updater: (databaseItems: LookupTableItem[]) => Promise<void>): Promise<void> {    
     const databaseItems = getDatabaseItems(updateMessage);
     await updater(databaseItems);
 }
 
-function getDatabaseItems(updateMessage: UpdateMessage): DatabaseItem[] {
+function getDatabaseItems(updateMessage: FileUpdateMessage): LookupTableItem[] {
     
     const fileType = updateMessage.headerLine.split('|')[1] as FileType;
 
     // TODO 12Sep20: How can we reject the message if we are not able to process it?
 
-    let databaseItems: DatabaseItem[];
+    let databaseItems: LookupTableItem[];
 
     switch (fileType) {
 
@@ -114,13 +114,13 @@ function getDatabaseItems(updateMessage: UpdateMessage): DatabaseItem[] {
     return databaseItems;
 }
 
-function getAppointmentDatabaseItems(updateMessage: UpdateMessage): Array<FirmPrincipalDatabaseItem | FirmAppointedRepresentativeDatabaseItem> {
+function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<FirmPrincipalLookupTableItem | FirmAppointedRepresentativeLookupTableItem> {
 
     const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 9));
 
     const appointmentDataValues = dataValuesArray[0];
 
-    const firmAppointedRepresentative: FirmPrincipalDatabaseItem = {
+    const firmAppointedRepresentative: FirmPrincipalLookupTableItem = {
         firmReference: appointmentDataValues[0],
         itemType: `FirmPrincipal-${appointmentDataValues[1]}`,
         principalFirmRef: appointmentDataValues[1],
@@ -128,9 +128,9 @@ function getAppointmentDatabaseItems(updateMessage: UpdateMessage): Array<FirmPr
         statusEffectiveDate: getDateItemValue(appointmentDataValues[3]),
     };
 
-    firmAppointedRepresentative.itemHash = DatabaseItem.getItemHash(firmAppointedRepresentative);
+    firmAppointedRepresentative.itemHash = LookupTableItem.getItemHash(firmAppointedRepresentative);
 
-    const firmPrincipal: FirmAppointedRepresentativeDatabaseItem = {
+    const firmPrincipal: FirmAppointedRepresentativeLookupTableItem = {
         firmReference: appointmentDataValues[1],
         itemType: `FirmAppointedRepresentative-${appointmentDataValues[0]}`,
         appointedRepresentativeFirmRef: appointmentDataValues[0],
@@ -138,12 +138,12 @@ function getAppointmentDatabaseItems(updateMessage: UpdateMessage): Array<FirmPr
         statusEffectiveDate: firmAppointedRepresentative.statusEffectiveDate,
     };
 
-    firmPrincipal.itemHash = DatabaseItem.getItemHash(firmPrincipal);
+    firmPrincipal.itemHash = LookupTableItem.getItemHash(firmPrincipal);
 
     return [firmAppointedRepresentative, firmPrincipal];
 }
 
-function getFirmPermissionDatabaseItems(updateMessage: UpdateMessage): FirmPermissionsDatabaseItem[] {
+function getFirmPermissionDatabaseItems(updateMessage: FileUpdateMessage): FirmPermissionsLookupTableItem[] {
 
     const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 8));
 
@@ -157,19 +157,19 @@ function getFirmPermissionDatabaseItems(updateMessage: UpdateMessage): FirmPermi
             };
         });
 
-    const firmPermissionsDatabaseItem: FirmPermissionsDatabaseItem = {
+    const firmPermissionsDatabaseItem: FirmPermissionsLookupTableItem = {
         firmReference: dataValuesArray[0][0],
         itemType: `RegulatedActivityPermissions-${dataValuesArray[0][1]}`,
         regulatedActivityCode: dataValuesArray[0][1],
         permissions: getFirmPermissions(dataValuesArray)
     };
 
-    firmPermissionsDatabaseItem.itemHash = DatabaseItem.getItemHash(firmPermissionsDatabaseItem);
+    firmPermissionsDatabaseItem.itemHash = LookupTableItem.getItemHash(firmPermissionsDatabaseItem);
 
     return [firmPermissionsDatabaseItem];
 }
 
-function getAlternativeFirmNameDatabaseItems(updateMessage: UpdateMessage): AlternativeFirmNamesDatabaseItem[] {
+function getAlternativeFirmNameDatabaseItems(updateMessage: FileUpdateMessage): AlternativeFirmNamesLookupTableItem[] {
 
     const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 8));
 
@@ -182,13 +182,13 @@ function getAlternativeFirmNameDatabaseItems(updateMessage: UpdateMessage): Alte
             };
         });
 
-    const alternativeNamesDatabaseItem: AlternativeFirmNamesDatabaseItem = {
+    const alternativeNamesDatabaseItem: AlternativeFirmNamesLookupTableItem = {
         firmReference: dataValuesArray[0][0],
         itemType: 'AlternativeFirmNames',
         names: getAlternativeNames(dataValuesArray)
     };
 
-    alternativeNamesDatabaseItem.itemHash = DatabaseItem.getItemHash(alternativeNamesDatabaseItem);
+    alternativeNamesDatabaseItem.itemHash = LookupTableItem.getItemHash(alternativeNamesDatabaseItem);
 
     return [alternativeNamesDatabaseItem];
 }
@@ -202,13 +202,13 @@ function getOptionalDateItemValue(dateString: string): string | undefined {
     return (dateString === '') ? undefined : getDateItemValue(dateString);
 }
 
-function getFirmsMasterListDatabaseItems(updateMessage: UpdateMessage): FirmAuthorisationDatabaseItem[] {
+function getFirmsMasterListDatabaseItems(updateMessage: FileUpdateMessage): FirmAuthorisationLookupTableItem[] {
 
     const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 29));
 
     const firmAuthorisationValues = dataValuesArray[0];
 
-    const firmAuthorisationDatabaseItem: FirmAuthorisationDatabaseItem = {
+    const firmAuthorisationDatabaseItem: FirmAuthorisationLookupTableItem = {
         firmReference: firmAuthorisationValues[0],
         itemType: 'FirmAuthorisation',
         registeredFirmName: firmAuthorisationValues[1],
@@ -223,7 +223,7 @@ function getFirmsMasterListDatabaseItems(updateMessage: UpdateMessage): FirmAuth
         currentAuthorisationStatusCode: firmAuthorisationValues[19],
     };
 
-    firmAuthorisationDatabaseItem.itemHash = DatabaseItem.getItemHash(firmAuthorisationDatabaseItem);
+    firmAuthorisationDatabaseItem.itemHash = LookupTableItem.getItemHash(firmAuthorisationDatabaseItem);
 
     return [firmAuthorisationDatabaseItem];
 }

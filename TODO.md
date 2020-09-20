@@ -3,10 +3,15 @@
 ## Next
 
 * Turn SNS events into SQS jobs:
+  * Export to a new 'Iterator Table' and an AppSync query to get blocks from it
   * Export to [Amazon Elasticsearch](https://docs.aws.amazon.com/elasticsearch-service/index.html) to do search by name and location
     * [Loading Streaming Data into Amazon ES from Amazon DynamoDB](https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-aws-integrations.html#es-aws-integrations-dynamodb-es)
 
 ## Future
+
+* Use events to keep an 'IsMortgageFirm' flag correct, i.e. on permission change, check if a principal, if so then update the ARs
+
+* Change to read before update with optimistic locking of database items?
 
 * Store lambdas, schemas and resolvers in S3
   * https://adamtheautomator.com/upload-local-files-aws-s3-aws-cli/
@@ -20,9 +25,6 @@
   * Should this info be a separate db item?
   * We wouldn't want a separate event => infinite loop
   * How would we merge the db items in the API? E.g. FirmAuthorisation and FirmAuthorisation_Ext
-
-* Implement optimistic locking of database items
-  * Q. Why would we want to do this? Is it just to say we have?
 
 * Add a priority update queue written to by GraphQL API
   * I.e. refresh permissions from the FCA
