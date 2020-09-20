@@ -19,20 +19,36 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         console.log(`lookupTableEventMessage: ${JSON.stringify(lookupTableEventMessage)}`);
 
-        if (lookupTableEventMessage.itemType === 'FirmAuthorisation') {
-            
-            const params: any = {
-                TableName: process.env.TARGET_TABLE_NAME,
-                Item: {
-                    iteratorType: 'FirmAuthorisation',
-                    sortKey: lookupTableEventMessage.firmReference
-                }
-            };
-    
-            await dynamoDbClient.put(params).promise();    
+        /*
+            AlternativeFirmNames
+            `FirmPrincipal-${appointmentDataValues[1]}`
+            `RegulatedActivityPermissions-${dataValuesArray[0][1]}`
+        */
+
+        const itemTypeMatch = 
+            lookupTableEventMessage.itemType.match(
+                /^(?<iteratorType>(FirmAuthorisation|AlternativeFirmNames|FirmPrincipal|RegulatedActivityPermissions))(-(?<sortKeySuffix>.*))?$/);
+
+        if (itemTypeMatch === null) {
+            throw new Error(`Cannot match itemType: ${lookupTableEventMessage.itemType}`);
         }
 
-        // TODO 20Sep20: Handle the other cases
+        // TODO 20Sep20: Assumes firmReference is always the same length, we also need to pad activity code as well
+
+        const sortKey =
+            itemTypeMatch.groups?.sortKeySuffix === undefined
+                ? lookupTableEventMessage.firmReference
+                : `${lookupTableEventMessage.firmReference}-${itemTypeMatch.groups?.sortKeySuffix}`;
+
+        const params: any = {
+            TableName: process.env.TARGET_TABLE_NAME,
+            Item: {
+                iteratorType: itemTypeMatch.groups?.iteratorType,
+                sortKey: sortKey
+            }
+        };
+    
+        await dynamoDbClient.put(params).promise();
     }
     
     console.log('Exiting');
