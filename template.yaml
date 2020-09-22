@@ -8,7 +8,8 @@ Globals:
   Function:
     ReservedConcurrentExecutions: 10
     Runtime: nodejs12.x
-    CodeUri: dist/
+    # CodeUri: dist/
+    CodeUri: s3://lambda-source-200921/serverless-file-processing.zip
     Timeout: 3
   
 Parameters:
