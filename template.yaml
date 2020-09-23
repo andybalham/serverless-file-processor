@@ -3,16 +3,10 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   serverless-file-processing
   
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
-Globals:
-  Function:
-    ReservedConcurrentExecutions: 10
-    Runtime: nodejs12.x
-    # CodeUri: dist/
-    CodeUri: s3://lambda-source-200921/serverless-file-processing.zip
-    Timeout: 3
-  
 Parameters:
+  SourceBucket:
+    Type: String
+    Default: s3://agb-app-source
   ApplicationName:
     Type: String
     Default: serverless-file-processing
@@ -24,6 +18,15 @@ Parameters:
     AllowedValues: [true, false]
     Default: true
 
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    ReservedConcurrentExecutions: 10
+    Runtime: nodejs12.x
+    # CodeUri: dist/
+    CodeUri: s3://lambda-source-200921/serverless-file-processing.zip
+    Timeout: 3
+  
 Resources:
     
   FileBucket:
@@ -318,23 +321,25 @@ Resources:
     DependsOn: LookupApi
     Properties:
       ApiId: !GetAtt LookupApi.ApiId
-      Definition: |
-        type FirmAuthorisation {
-          registeredFirmName: String!
-          firmReference: String!
-          addressLine1: String
-          addressLine2: String
-          addressLine3: String
-          addressLine4: String
-          addressLine5: String
-          addressLine6: String
-          postcodeIn: String
-          postcodeOut: String
-          currentAuthorisationStatusCode: String
-        }
-        type Query {
-          getFirmAuthorisation(firmReference: String!): FirmAuthorisation
-        }
+      # DefinitionS3Location: !Sub ${SourceBucket}/${ApplicationName}/api.graphqls
+      DefinitionS3Location: s3://agb-app-source/serverless-file-processing/api.graphqls
+      # Definition: |
+      #   type FirmAuthorisation {
+      #     registeredFirmName: String!
+      #     firmReference: String!
+      #     addressLine1: String
+      #     addressLine2: String
+      #     addressLine3: String
+      #     addressLine4: String
+      #     addressLine5: String
+      #     addressLine6: String
+      #     postcodeIn: String
+      #     postcodeOut: String
+      #     currentAuthorisationStatusCode: String
+      #   }
+      #   type Query {
+      #     getFirmAuthorisation(firmReference: String!): FirmAuthorisation
+      #   }
 
   QueryGetFirmAuthorisationResolver:
     Type: AWS::AppSync::Resolver
@@ -344,16 +349,18 @@ Resources:
       TypeName: Query
       FieldName: getFirmAuthorisation
       DataSourceName: !GetAtt LookupDynamoDBTableDataSource.Name
-      RequestMappingTemplate: |
-        {
-            "version": "2017-02-28",
-            "operation": "GetItem",
-            "key": {
-                "firmReference": $util.dynamodb.toDynamoDBJson($ctx.args.firmReference),
-                "itemType": $util.dynamodb.toDynamoDBJson("FirmAuthorisation"),
-            }
-        }        
-      ResponseMappingTemplate: "$utils.toJson($ctx.result)"
+      RequestMappingTemplateS3Location: s3://agb-app-source/serverless-file-processing/getFirmAuthorisationRequest.vtl
+      ResponseMappingTemplateS3Location: s3://agb-app-source/serverless-file-processing/getFirmAuthorisationResponse.vtl
+      # RequestMappingTemplate: |
+      #   {
+      #       "version": "2017-02-28",
+      #       "operation": "GetItem",
+      #       "key": {
+      #           "firmReference": $util.dynamodb.toDynamoDBJson($ctx.args.firmReference),
+      #           "itemType": $util.dynamodb.toDynamoDBJson("FirmAuthorisation"),
+      #       }
+      #   }        
+      # ResponseMappingTemplate: "$utils.toJson($ctx.result)"
 
 Outputs:
   

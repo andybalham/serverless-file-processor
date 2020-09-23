@@ -1,0 +1,20 @@
+{
+    "Records": [
+        {
+            "messageId": "6bb73e92-3e69-42f4-9a3c-01b2b1f064f7",
+            "receiptHandle": "AQEBBKQEi8+mvALJ0KFXnTqpQMpqxCl6DafkcPclGp+IFCl41aLbi2EEpWYL27gcB/cw5pN0BMnU8CiOMOGBFkfqu9WRc9fDHHNbzXagio0Ro1SMP1ji+YvHSmKgDrp2Gvj1Vr/ho5oyjvEU9lkafACqV6vRPD3EWO5ozIOVZvU2EYR/8O3St1Xaz5dXkx+SWcWzQYPs5Ab+YF4dXAd+nwrqobZRYiwzyEq+Vc3Rzijv2gOQnkb7aL/bxa3E6yI4zQSvb0+7Ihuo6UTKKXg5rfL9c5vJa9EDTR2Ly6FuNqm3p7DEYuM6si2aKDJsN0sHUwj5bqiCrnm7qr4RlE5GafFmTmaFyZ+Pv1lDhiioRehm3wOgJiqq2bYHS+J72nnROEk4EJg4QeuE7LBfkb7gtqiF3MA98o1iIOjDOkSu0V/n+5fCJgnbEOSoulc+BDTpxC7o",
+            "body": "{\n  \"Type\" : \"Notification\",\n  \"MessageId\" : \"f17cadba-3773-5c87-8a84-fa5e71d51641\",\n  \"TopicArn\" : \"arn:aws:sns:eu-west-2:361728023653:serverless-file-processing-lookup-table-event-topic\",\n  \"Message\" : \"{\\\"eventName\\\":\\\"INSERT\\\",\\\"firmReference\\\":\\\"675283\\\",\\\"itemType\\\":\\\"FirmPrincipal-100045\\\"}\",\n  \"Timestamp\" : \"2020-09-22T18:37:26.621Z\",\n  \"SignatureVersion\" : \"1\",\n  \"Signature\" : \"rn7TwMOQxswpXH8US+Ozv6HytIbA7dPbf0eev+SlRza2CuFE/m3THysST/4EB3y+a0aw+MGZfMMc2uAQzIvcqDUkMNGcFGE9Kl4Rt4jTU7qk4wucQBVViWa8TLY3Wk8t23EdVbqQSfxBpBUZ7lkIJ5j+1VJd+vpaq0/KmJcPU6j0jkBX0adhm9Q0iuZvNWThG3dscQkzOQsc+BLG3RX1cLGimBAnroHQ5239cE7ISi8vNTEfQjlkdW7EFvq9Dwg7tHlnA4OlwSSVQfmjTPs4jWLZ8aM8ignXYXI713x3pT38Usjk9GZVteukx1ObKkfxeNgllbmJokkoxst/JJ04Iw==\",\n  \"SigningCertURL\" : \"https://sns.eu-west-2.amazonaws.com/SimpleNotificationService-a86cb10b4e1f29c941702d737128f7b6.pem\",\n  \"UnsubscribeURL\" : \"https://sns.eu-west-2.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:eu-west-2:361728023653:serverless-file-processing-lookup-table-event-topic:9503ebd7-e389-4439-93f7-3e790c6d7ba3\",\n  \"MessageAttributes\" : {\n    \"FirmReference\" : {\"Type\":\"String\",\"Value\":\"675283\"},\n    \"ItemType\" : {\"Type\":\"String\",\"Value\":\"FirmPrincipal-100045\"},\n    \"EventName\" : {\"Type\":\"String\",\"Value\":\"INSERT\"}\n  }\n}",
+            "attributes": {
+                "ApproximateReceiveCount": "44",
+                "SentTimestamp": "1600799846649",
+                "SenderId": "AIDAIVEA3AGEU7NF6DRAG",
+                "ApproximateFirstReceiveTimestamp": "1600799846649"
+            },
+            "messageAttributes": {},
+            "md5OfBody": "be8549a6179923433758ac689b12d464",
+            "eventSource": "aws:sqs",
+            "eventSourceARN": "arn:aws:sqs:eu-west-2:361728023653:serverless-file-processing-iterator-update-queue",
+            "awsRegion": "eu-west-2"
+        }
+    ]
+}

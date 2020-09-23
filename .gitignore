@@ -106,4 +106,3 @@ dist
 .aws-sam
 
 test/data/*.ext
-lambda.zip

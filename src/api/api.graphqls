@@ -1,0 +1,17 @@
+type FirmAuthorisation {
+    registeredFirmName: String!
+    firmReference: String!
+    addressLine1: String
+    addressLine2: String
+    addressLine3: String
+    addressLine4: String
+    addressLine5: String
+    addressLine6: String
+    postcodeIn: String
+    postcodeOut: String
+    currentAuthorisationStatusCode: String
+}
+
+type Query {
+    getFirmAuthorisation(firmReference: String!): FirmAuthorisation
+}

@@ -18,6 +18,7 @@
         "source.fixAll.eslint": true
     },
     "cSpell.ignoreWords": [
+        "graphqls",
         "linebyline",
         "moneytree",
         "northernfinancialservicesltd",

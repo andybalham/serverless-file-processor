@@ -1,6 +1,7 @@
 import { SNSMessage } from 'aws-lambda';
 import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import DynamoDB from 'aws-sdk/clients/dynamodb';
+import { interactiveDebug } from './debugUtils';
 import { LookupTableEventMessage } from './LookupTableEventMessage';
 
 const dynamoDbClient = new DynamoDB.DocumentClient();
@@ -19,38 +20,35 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         console.log(`lookupTableEventMessage: ${JSON.stringify(lookupTableEventMessage)}`);
 
-        /*
-            AlternativeFirmNames
-            `FirmPrincipal-${appointmentDataValues[1]}`
-            `RegulatedActivityPermissions-${dataValuesArray[0][1]}`
-        */
-
         const itemTypeMatch = 
             lookupTableEventMessage.itemType.match(
                 /^(?<iteratorType>(FirmAuthorisation|AlternativeFirmNames|FirmPrincipal|RegulatedActivityPermissions))(-(?<sortKeySuffix>.*))?$/);
 
         if (itemTypeMatch === null) {
-            throw new Error(`Cannot match itemType: ${lookupTableEventMessage.itemType}`);
+            console.log(`Skipping itemType: ${lookupTableEventMessage.itemType}`);
+            return;
         }
 
-        // TODO 20Sep20: Assumes firmReference is always the same length, we also need to pad activity code as well
+        const iteratorType = itemTypeMatch.groups?.iteratorType;
+        const sortKeySuffix = itemTypeMatch.groups?.sortKeySuffix;
 
         const sortKey =
-            itemTypeMatch.groups?.sortKeySuffix === undefined
+            sortKeySuffix === undefined
                 ? lookupTableEventMessage.firmReference
-                : `${lookupTableEventMessage.firmReference}-${itemTypeMatch.groups?.sortKeySuffix}`;
+                : `${lookupTableEventMessage.firmReference}-${(sortKeySuffix ?? 'undefined').padStart(6, '0')}`;
 
-        const params: any = {
+        const putParams: any = {
             TableName: process.env.TARGET_TABLE_NAME,
             Item: {
-                iteratorType: itemTypeMatch.groups?.iteratorType,
+                iteratorType: iteratorType,
                 sortKey: sortKey
             }
         };
+
+        interactiveDebug(() => `putParams=${JSON.stringify(putParams)}`);
     
-        await dynamoDbClient.put(params).promise();
+        await dynamoDbClient.put(putParams).promise();
     }
     
     console.log('Exiting');
 };
-
