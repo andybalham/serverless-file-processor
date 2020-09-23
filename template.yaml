@@ -322,7 +322,7 @@ Resources:
     Properties:
       ApiId: !GetAtt LookupApi.ApiId
       # DefinitionS3Location: !Sub ${SourceBucket}/${ApplicationName}/api.graphqls
-      DefinitionS3Location: s3://agb-app-source/serverless-file-processing/api.graphqls
+      DefinitionS3Location: !Sub ${SourceBucket}/${ApplicationName}/api.graphqls
       # Definition: |
       #   type FirmAuthorisation {
       #     registeredFirmName: String!
@@ -349,8 +349,8 @@ Resources:
       TypeName: Query
       FieldName: getFirmAuthorisation
       DataSourceName: !GetAtt LookupDynamoDBTableDataSource.Name
-      RequestMappingTemplateS3Location: s3://agb-app-source/serverless-file-processing/getFirmAuthorisationRequest.vtl
-      ResponseMappingTemplateS3Location: s3://agb-app-source/serverless-file-processing/getFirmAuthorisationResponse.vtl
+      RequestMappingTemplateS3Location: !Sub ${SourceBucket}/${ApplicationName}/getFirmAuthorisationRequest.vtl
+      ResponseMappingTemplateS3Location : !Sub ${SourceBucket}/${ApplicationName}/getFirmAuthorisationResponse.vtl
       # RequestMappingTemplate: |
       #   {
       #       "version": "2017-02-28",
