@@ -3,7 +3,7 @@ import { processFileStream } from '../src/fileProcessorLambda';
 import { processUpdateMessage } from '../src/fileUpdateProcessorLambda';
 import { expect } from 'chai';
 import { FileUpdateMessage } from '../src/FileUpdateMessage';
-import { DatabaseItem, FirmAuthorisationDatabaseItem, AlternativeFirmNamesDatabaseItem, FirmPermissionsDatabaseItem, FirmAppointedRepresentativeDatabaseItem, FirmPrincipalDatabaseItem } from '../src/DatabaseItems';
+import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNamesLookupTableItem, FirmPermissionsLookupTableItem, FirmAppointedRepresentativeLookupTableItem, FirmPrincipalLookupTableItem } from '../src/LookupTableItems';
 import { parseLine } from '../src/parsing';
 
 describe('File reading', () => {
@@ -67,7 +67,7 @@ describe('File reading', () => {
             ]
         };
 
-        const expectedItems: FirmAuthorisationDatabaseItem[] = [
+        const expectedItems: FirmAuthorisationLookupTableItem[] = [
             {
                 firmReference: '100425',
                 itemType: 'FirmAuthorisation',
@@ -84,12 +84,12 @@ describe('File reading', () => {
             }
         ];
 
-        expectedItems.forEach(i => i.itemHash = DatabaseItem.getItemHash(i));
+        expectedItems.forEach(i => i.itemHash = LookupTableItem.getItemHash(i));
 
-        let actualItems: DatabaseItem[] | null = null;
+        let actualItems: LookupTableItem[] | null = null;
 
-        await processUpdateMessage(updateMessage, async (databaseItems) => {
-            actualItems = databaseItems;
+        await processUpdateMessage(updateMessage, async (LookupTableItems) => {
+            actualItems = LookupTableItems;
         });
 
         expect(actualItems).to.deep.equal(expectedItems);
@@ -105,7 +105,7 @@ describe('File reading', () => {
             ]
         };
 
-        const expectedItems: AlternativeFirmNamesDatabaseItem[] = [
+        const expectedItems: AlternativeFirmNamesLookupTableItem[] = [
             {
                 firmReference: '100425',
                 itemType: 'AlternativeFirmNames',
@@ -124,12 +124,12 @@ describe('File reading', () => {
             },
         ];
 
-        expectedItems.forEach(i => i.itemHash = DatabaseItem.getItemHash(i));
+        expectedItems.forEach(i => i.itemHash = LookupTableItem.getItemHash(i));
 
-        let actualItems: DatabaseItem[] | null = null;
+        let actualItems: LookupTableItem[] | null = null;
 
-        await processUpdateMessage(updateMessage, async (databaseItems) => {
-            actualItems = databaseItems;
+        await processUpdateMessage(updateMessage, async (LookupTableItems) => {
+            actualItems = LookupTableItems;
         });
 
         expect(actualItems).to.deep.equal(expectedItems);
@@ -145,7 +145,7 @@ describe('File reading', () => {
             ]
         };
 
-        const expectedItems: FirmPermissionsDatabaseItem[] = [
+        const expectedItems: FirmPermissionsLookupTableItem[] = [
             {
                 firmReference: '100013',
                 itemType: 'RegulatedActivityPermissions-14',
@@ -167,12 +167,12 @@ describe('File reading', () => {
             },
         ];
 
-        expectedItems.forEach(i => i.itemHash = DatabaseItem.getItemHash(i));
+        expectedItems.forEach(i => i.itemHash = LookupTableItem.getItemHash(i));
 
-        let actualItems: DatabaseItem[] | null = null;
+        let actualItems: LookupTableItem[] | null = null;
 
-        await processUpdateMessage(updateMessage, async (databaseItems) => {
-            actualItems = databaseItems;
+        await processUpdateMessage(updateMessage, async (LookupTableItems) => {
+            actualItems = LookupTableItems;
         });
 
         expect(actualItems).to.deep.equal(expectedItems);
@@ -187,7 +187,7 @@ describe('File reading', () => {
             ]
         };
 
-        const expectedItems: Array<FirmAppointedRepresentativeDatabaseItem | FirmPrincipalDatabaseItem> = [
+        const expectedItems: Array<FirmAppointedRepresentativeLookupTableItem | FirmPrincipalLookupTableItem> = [
             {
                 firmReference: '100014',
                 itemType: 'FirmPrincipal-117659',
@@ -204,12 +204,12 @@ describe('File reading', () => {
             },
         ];
 
-        expectedItems.forEach(i => i.itemHash = DatabaseItem.getItemHash(i));
+        expectedItems.forEach(i => i.itemHash = LookupTableItem.getItemHash(i));
 
-        let actualItems: DatabaseItem[] | null = null;
+        let actualItems: LookupTableItem[] | null = null;
 
-        await processUpdateMessage(updateMessage, async (databaseItems) => {
-            actualItems = databaseItems;
+        await processUpdateMessage(updateMessage, async (LookupTableItems) => {
+            actualItems = LookupTableItems;
         });
 
         expect(actualItems).to.deep.equal(expectedItems);

@@ -1,17 +1,57 @@
-type FirmAuthorisation {
-    registeredFirmName: String!
-    firmReference: String!
-    addressLine1: String
-    addressLine2: String
-    addressLine3: String
-    addressLine4: String
-    addressLine5: String
-    addressLine6: String
-    postcodeIn: String
-    postcodeOut: String
-    currentAuthorisationStatusCode: String
+type AlternativeFirmName {
+	name: String!
+	effectiveDate: String!
+	endDate: String
 }
 
-type Query {
-    getFirmAuthorisation(firmReference: String!): FirmAuthorisation
+# type FirmAppointedRepresentative {
+# 	appointedRepresentativeFirmRef: String
+# 	statusCode: String
+# 	statusEffectiveDate: String
+# }
+
+type FirmAuthorisation {
+	registeredFirmName: String!
+	firmReference: String!
+	addressLine1: String
+	addressLine2: String
+	addressLine3: String
+	addressLine4: String
+	addressLine5: String
+	addressLine6: String
+	postcodeIn: String
+	postcodeOut: String
+	currentAuthorisationStatusCode: String
+	alternativeFirmNames: [AlternativeFirmName]!
+	firmPrincipals(statusCode: String): [FirmPrincipal]!
+	# regulatedActivities: [RegulatedActivity]!
 }
+
+# type FirmPermission {
+# 	investmentTypeCode: String
+# 	customerTypeCode: String
+# 	statusCode: String!
+# 	effectiveDate: String!
+# 	debugValue: String
+# }
+
+type FirmPrincipal {
+	principalFirmRef: String!
+	statusCode: String!
+	statusEffectiveDate: String!
+}
+
+# type PaginatedFirmAppointedRepresentatives {
+# 	items: [FirmAppointedRepresentative!]!
+# 	nextToken: String
+# }
+
+type Query {
+	getFirmAuthorisation(firmReference: String!): FirmAuthorisation
+	# getFirmAppointedRepresentatives(firmReference: String!, nextToken: String, pageSize: Int): PaginatedFirmAppointedRepresentatives!
+}
+
+# type RegulatedActivity {
+# 	regulatedActivityCode: String!
+# 	permissions: [FirmPermission]!
+# }

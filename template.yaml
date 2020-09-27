@@ -6,13 +6,15 @@ Description: >
 Parameters:
   SourceBucket:
     Type: String
-    Default: s3://agb-app-source
+    Default: agb-app-source
   ApplicationName:
     Type: String
     Default: serverless-file-processing
   ApiStageName:
     Type: String
     Default: dev
+  ApiVersion:
+    Type: String
   EnableSQS:
     Type: String
     AllowedValues: [true, false]
@@ -23,9 +25,10 @@ Globals:
   Function:
     ReservedConcurrentExecutions: 10
     Runtime: nodejs12.x
-    # CodeUri: dist/
-    CodeUri: s3://lambda-source-200921/serverless-file-processing.zip
     Timeout: 3
+    CodeUri:
+      Bucket: !Sub ${SourceBucket}
+      Key: !Sub ${ApplicationName}/lambda.zip
   
 Resources:
     
@@ -240,7 +243,6 @@ Resources:
       - IteratorUpdateQueue
       - IteratorTable
     Properties:
-      FunctionName: !Sub ${ApplicationName}-iterator-update-processor-function
       Handler: iteratorUpdateProcessorLambda.handle
       Timeout: 10
       Policies:
@@ -321,25 +323,7 @@ Resources:
     DependsOn: LookupApi
     Properties:
       ApiId: !GetAtt LookupApi.ApiId
-      # DefinitionS3Location: !Sub ${SourceBucket}/${ApplicationName}/api.graphqls
-      DefinitionS3Location: !Sub ${SourceBucket}/${ApplicationName}/api.graphqls
-      # Definition: |
-      #   type FirmAuthorisation {
-      #     registeredFirmName: String!
-      #     firmReference: String!
-      #     addressLine1: String
-      #     addressLine2: String
-      #     addressLine3: String
-      #     addressLine4: String
-      #     addressLine5: String
-      #     addressLine6: String
-      #     postcodeIn: String
-      #     postcodeOut: String
-      #     currentAuthorisationStatusCode: String
-      #   }
-      #   type Query {
-      #     getFirmAuthorisation(firmReference: String!): FirmAuthorisation
-      #   }
+      DefinitionS3Location: !Sub s3://${SourceBucket}/${ApplicationName}/api-${ApiVersion}/api.graphqls
 
   QueryGetFirmAuthorisationResolver:
     Type: AWS::AppSync::Resolver
@@ -349,18 +333,30 @@ Resources:
       TypeName: Query
       FieldName: getFirmAuthorisation
       DataSourceName: !GetAtt LookupDynamoDBTableDataSource.Name
-      RequestMappingTemplateS3Location: !Sub ${SourceBucket}/${ApplicationName}/getFirmAuthorisationRequest.vtl
-      ResponseMappingTemplateS3Location : !Sub ${SourceBucket}/${ApplicationName}/getFirmAuthorisationResponse.vtl
-      # RequestMappingTemplate: |
-      #   {
-      #       "version": "2017-02-28",
-      #       "operation": "GetItem",
-      #       "key": {
-      #           "firmReference": $util.dynamodb.toDynamoDBJson($ctx.args.firmReference),
-      #           "itemType": $util.dynamodb.toDynamoDBJson("FirmAuthorisation"),
-      #       }
-      #   }        
-      # ResponseMappingTemplate: "$utils.toJson($ctx.result)"
+      RequestMappingTemplateS3Location: !Sub s3://${SourceBucket}/${ApplicationName}/api-${ApiVersion}/getFirmAuthorisationRequest.vtl
+      ResponseMappingTemplateS3Location : !Sub s3://${SourceBucket}/${ApplicationName}/api-${ApiVersion}/getFirmAuthorisationResponse.vtl
+
+  QueryAlternativeFirmNamesResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: LookupSchema
+    Properties:
+      ApiId: !GetAtt LookupApi.ApiId
+      TypeName: FirmAuthorisation
+      FieldName: alternativeFirmNames
+      DataSourceName: !GetAtt LookupDynamoDBTableDataSource.Name
+      RequestMappingTemplateS3Location: !Sub s3://${SourceBucket}/${ApplicationName}/api-${ApiVersion}/alternativeFirmNamesRequest.vtl
+      ResponseMappingTemplateS3Location : !Sub s3://${SourceBucket}/${ApplicationName}/api-${ApiVersion}/alternativeFirmNamesResponse.vtl
+
+  QueryFirmPrincipalsNamesResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: LookupSchema
+    Properties:
+      ApiId: !GetAtt LookupApi.ApiId
+      TypeName: FirmAuthorisation
+      FieldName: firmPrincipals
+      DataSourceName: !GetAtt LookupDynamoDBTableDataSource.Name
+      RequestMappingTemplateS3Location: !Sub s3://${SourceBucket}/${ApplicationName}/api-${ApiVersion}/firmPrincipalsRequest.vtl
+      ResponseMappingTemplateS3Location : !Sub s3://${SourceBucket}/${ApplicationName}/api-${ApiVersion}/firmPrincipalsResponse.vtl
 
 Outputs:
   

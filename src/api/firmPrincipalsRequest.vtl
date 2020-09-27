@@ -1,0 +1,21 @@
+{
+    "version" : "2017-02-28",
+    "operation" : "Query",
+    "query" : {
+        ## Provide a query expression. **
+        "expression": "firmReference = :firmReference and begins_with (itemType, :itemTypePrefix)",
+        "expressionValues" : {
+            ":firmReference" : $util.dynamodb.toDynamoDBJson($ctx.source.firmReference),
+            ":itemTypePrefix" : $util.dynamodb.toDynamoDBJson("FirmPrincipal-")
+        }
+    }
+    #if( ${ctx.args.statusCode} )
+    ,
+    "filter": {
+        "expression": "statusCode = :statusCode",
+      	"expressionValues" : {
+          ":statusCode": $util.dynamodb.toDynamoDBJson($ctx.args.statusCode)
+      }
+    }
+    #end
+}
