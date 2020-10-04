@@ -58,7 +58,13 @@ export class FirmPrincipalLookupTableItem extends LookupTableItem {
 }
 
 export class FirmAppointedRepresentativeLookupTableItem extends LookupTableItem {
+    // static readonly ItemTypePrefix = 'FirmAppointedRepresentative-'
     appointedRepresentativeFirmRef: string;
     statusCode: string;
     statusEffectiveDate: string;
+}
+
+export class IsActiveMortgageFirmLookupTableItem extends LookupTableItem {
+    static readonly ItemType = 'IsActiveMortgageFirm'
+    isActiveMortgageFirm: boolean;
 }

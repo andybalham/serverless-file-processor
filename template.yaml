@@ -138,7 +138,7 @@ Resources:
             TableName: !Ref LookupTable
       Environment:
         Variables:
-          TARGET_TABLE_NAME: !Ref LookupTable
+          LOOKUP_TABLE_NAME: !Ref LookupTable
       Events:
         UnprocessedUpdateEvent:
           Type: SQS
@@ -153,11 +153,18 @@ Resources:
       TopicName:
         Fn::Sub: ${ApplicationName}-lookup-table-event-topic
 
+  PermissionsUpdateEventTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName:
+        Fn::Sub: ${ApplicationName}-permission-update-event-topic
+
   LookupTableEventProcessorFunction:
     Type: AWS::Serverless::Function
     DependsOn: 
       - LookupTable
       - LookupTableEventTopic
+      - PermissionsUpdateEventTopic
     Properties:
       FunctionName: !Sub ${ApplicationName}-lookup-table-event-processor-function
       Handler: lookupTableEventProcessorLambda.handle
@@ -165,12 +172,18 @@ Resources:
       Environment:
         Variables:
           LOOKUP_TABLE_EVENT_TOPIC: !Ref LookupTableEventTopic
+          PERMISSIONS_UPDATE_EVENT_TOPIC: !Ref PermissionsUpdateEventTopic
+          LOOKUP_TABLE_NAME: !Ref LookupTable
       Policies:
         - DynamoDBStreamReadPolicy:
             TableName: !Ref LookupTable
             StreamName: "*"
         - SNSPublishMessagePolicy:
             TopicName: !GetAtt LookupTableEventTopic.TopicName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LookupTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt PermissionsUpdateEventTopic.TopicName
       Events:
         DatabaseEvent:
           Type: DynamoDB
@@ -243,6 +256,7 @@ Resources:
       - IteratorUpdateQueue
       - IteratorTable
     Properties:
+      FunctionName: !Sub ${ApplicationName}-iterator-update-processor-function
       Handler: iteratorUpdateProcessorLambda.handle
       Timeout: 10
       Policies:
@@ -252,12 +266,120 @@ Resources:
             TableName: !Ref IteratorTable
       Environment:
         Variables:
-          TARGET_TABLE_NAME: !Ref IteratorTable
+          LOOKUP_TABLE_NAME: !Ref IteratorTable
       Events:
         UnprocessedUpdateEvent:
           Type: SQS
           Properties:
             Queue: !GetAtt IteratorUpdateQueue.Arn
+            BatchSize: 10
+            Enabled: !Ref EnableSQS
+
+  PermissionChangedProcessorFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+    #   - IteratorUpdateQueue
+      - LookupTable
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-permission-changed-processor-function
+      Handler: permissionChangedProcessorLambda.handle
+      Timeout: 10
+      Policies:
+      #   - SQSPollerPolicy:
+      #       QueueName: !GetAtt IteratorUpdateQueue.QueueName
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LookupTable
+      Environment:
+        Variables:
+          LOOKUP_TABLE_NAME: !Ref LookupTable
+      # Events:
+      #   UnprocessedUpdateEvent:
+      #     Type: SQS
+      #     Properties:
+      #       Queue: !GetAtt IteratorUpdateQueue.Arn
+      #       BatchSize: 10
+      #       Enabled: !Ref EnableSQS
+
+  SearchUpdateQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${ApplicationName}-search-update-queue
+      ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 60
+
+  SearchUpdateQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    DependsOn: SearchUpdateQueue
+    Properties: 
+      Queues: 
+        - !Ref SearchUpdateQueue
+      PolicyDocument: 
+        Statement: 
+          - 
+            Action: 
+              - SQS:SendMessage
+            Effect: Allow
+            Resource: !GetAtt SearchUpdateQueue.Arn
+            Principal:  
+              Service: sns.amazonaws.com
+
+  SearchUpdateQueueSubscription:
+    Type: AWS::SNS::Subscription
+    DependsOn: 
+      - LookupTableEventTopic
+      - SearchUpdateQueue
+    Properties: 
+      Endpoint: !GetAtt SearchUpdateQueue.Arn
+      FilterPolicy: 
+        EventName: [ INSERT, MODIFY ]
+        ItemType: [ FirmAuthorisation, AlternativeFirmNames ]
+      Protocol: sqs
+      TopicArn: !Ref LookupTableEventTopic
+
+  # SearchTable:
+  #   Type: AWS::DynamoDB::Table
+  #   Properties: 
+  #     TableName: !Sub ${ApplicationName}-search-table
+  #     ProvisionedThroughput: 
+  #       ReadCapacityUnits: 5
+  #       WriteCapacityUnits: 5
+  #     AttributeDefinitions: 
+  #       - 
+  #         AttributeName: searchType
+  #         AttributeType: S
+  #       - 
+  #         AttributeName: sortKey
+  #         AttributeType: S
+  #     KeySchema: 
+  #       - 
+  #         AttributeName: searchType
+  #         KeyType: HASH
+  #       - 
+  #         AttributeName: sortKey
+  #         KeyType: RANGE
+
+  SearchUpdateProcessorFunction:
+    Type: AWS::Serverless::Function
+    DependsOn:
+      - SearchUpdateQueue
+      # - SearchTable
+    Properties:
+      FunctionName: !Sub ${ApplicationName}-search-update-processor-function
+      Handler: searchUpdateProcessorLambda.handle
+      Timeout: 10
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !GetAtt SearchUpdateQueue.QueueName
+        # - DynamoDBCrudPolicy:
+        #     TableName: !Ref SearchTable
+      # Environment:
+      #   Variables:
+      #     LOOKUP_TABLE_NAME: !Ref SearchTable
+      Events:
+        UnprocessedUpdateEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SearchUpdateQueue.Arn
             BatchSize: 10
             Enabled: !Ref EnableSQS
 

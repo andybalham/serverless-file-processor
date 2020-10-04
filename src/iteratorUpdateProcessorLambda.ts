@@ -38,7 +38,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
                 : `${lookupTableEventMessage.firmReference}-${(sortKeySuffix ?? 'undefined').padStart(6, '0')}`;
 
         const putParams: any = {
-            TableName: process.env.TARGET_TABLE_NAME,
+            TableName: process.env.LOOKUP_TABLE_NAME,
             Item: {
                 iteratorType: iteratorType,
                 sortKey: sortKey

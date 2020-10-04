@@ -1,9 +1,12 @@
 import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { FileUpdateMessage } from './FileUpdateMessage';
 import { FileType } from './FileType';
-import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNamesLookupTableItem, AlternativeFirmName, FirmPermissionsLookupTableItem, FirmPermission, FirmPrincipalLookupTableItem, FirmAppointedRepresentativeLookupTableItem } from './LookupTableItems';
+import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNamesLookupTableItem, AlternativeFirmName, FirmPermissionsLookupTableItem, FirmPermission, FirmPrincipalLookupTableItem as FirmAppointedRepresentativeLookupTableItem, FirmAppointedRepresentativeLookupTableItem as FirmPrincipalLookupTableItemX } from './LookupTableItems';
 import DynamoDB from 'aws-sdk/clients/dynamodb';
 import { parseLine } from './parsing';
+import { putItems } from './lookupTable';
+
+const dynamoDbClient = new DynamoDB.DocumentClient();
 
 export const handle = async (event: SQSEvent): Promise<any> => {
 
@@ -15,64 +18,14 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         const updateMessage: FileUpdateMessage = JSON.parse(sqsEventRecord.body);
 
-        await processUpdateMessage(updateMessage, updateDatabase);
+        await processUpdateMessage(
+            updateMessage, databaseItems => putItems(dynamoDbClient, databaseItems));
 
         console.log(`sqsEventRecord: ${JSON.stringify(sqsEventRecord)}`);
     }
     
     console.log('Exiting');
 };
-
-const dynamoDbClient = new DynamoDB.DocumentClient();
-
-async function updateDatabase(databaseItems: LookupTableItem[]): Promise<void> {
-
-    // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#transactWrite-property
-    // https://www.alexdebrie.com/posts/dynamodb-transactions/
-    // https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html
-
-    if (process.env.TARGET_TABLE_NAME === undefined) throw new Error('process.env.TARGET_TABLE_NAME === undefined');
-
-    // TODO 19Sep20: Avoid using transactions for single updates
-    
-    const putItems = databaseItems.map(item => { 
-        return {
-            Put: {
-                TableName: process.env.TARGET_TABLE_NAME ?? '',
-                Item: item,
-                ConditionExpression: 'itemHash <> :itemHash',
-                ExpressionAttributeValues: { ':itemHash': item.itemHash},
-                ReturnValuesOnConditionCheckFailure: 'NONE'
-            }
-        };
-    });
-
-    const params = {
-        TransactItems: putItems
-    };
-
-    try {
-        
-        await dynamoDbClient.transactWrite(params).promise();
-
-    } catch (error) {
-        
-        if (error instanceof Error) {
-            
-            console.log(`error.message: ${error.message}`);
-
-            if (!error.message.includes('ConditionalCheckFailed')) {
-                console.error('TODO: How should we handle this error?');
-                // throw error;
-            }
-
-        } else {
-            throw error;
-        }
-    }
-    
-    // console.log(`databaseItems: ${JSON.stringify(databaseItems)}`);
-}
 
 export async function processUpdateMessage(updateMessage: FileUpdateMessage, updater: (databaseItems: LookupTableItem[]) => Promise<void>): Promise<void> {    
     const databaseItems = getDatabaseItems(updateMessage);
@@ -114,15 +67,15 @@ function getDatabaseItems(updateMessage: FileUpdateMessage): LookupTableItem[] {
     return databaseItems;
 }
 
-function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<FirmPrincipalLookupTableItem | FirmAppointedRepresentativeLookupTableItem> {
+function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<FirmAppointedRepresentativeLookupTableItem | FirmPrincipalLookupTableItemX> {
 
     const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 9));
 
     const appointmentDataValues = dataValuesArray[0];
 
-    const firmAppointedRepresentative: FirmPrincipalLookupTableItem = {
+    const firmAppointedRepresentative: FirmAppointedRepresentativeLookupTableItem = {
         firmReference: appointmentDataValues[0],
-        itemType: `FirmPrincipal-${appointmentDataValues[1]}`,
+        itemType: `FirmAppointedRepresentative-${appointmentDataValues[1]}`,
         principalFirmRef: appointmentDataValues[1],
         statusCode: appointmentDataValues[2],
         statusEffectiveDate: getDateItemValue(appointmentDataValues[3]),
@@ -130,9 +83,9 @@ function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<Fi
 
     firmAppointedRepresentative.itemHash = LookupTableItem.getItemHash(firmAppointedRepresentative);
 
-    const firmPrincipal: FirmAppointedRepresentativeLookupTableItem = {
+    const firmPrincipal: FirmPrincipalLookupTableItemX = {
         firmReference: appointmentDataValues[1],
-        itemType: `FirmAppointedRepresentative-${appointmentDataValues[0]}`,
+        itemType: `FirmPrincipal-${appointmentDataValues[0]}`,
         appointedRepresentativeFirmRef: appointmentDataValues[0],
         statusCode: firmAppointedRepresentative.statusCode,
         statusEffectiveDate: firmAppointedRepresentative.statusEffectiveDate,
