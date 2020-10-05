@@ -1,7 +1,7 @@
 import { DynamoDBStreamEvent } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
 import SNS, { PublishInput } from 'aws-sdk/clients/sns';
-import { FirmAuthorisationLookupTableItem, ILookupTableItemKeys, LookupTableItem } from './LookupTableItems';
+import { FirmAuthorisationLookupTableItem, FirmPermissionsLookupTableItem, FirmPrincipalLookupTableItem, ILookupTableItemKeys, LookupTableItem } from './LookupTableItems';
 import { LookupTableEventMessage } from './LookupTableEventMessage';
 import { PermissionsChangedEventMessage } from './PermissionsChangedEventMessage';
 
@@ -76,7 +76,7 @@ async function processEventRecord(eventName: 'INSERT' | 'MODIFY' | 'REMOVE', eve
 
 function isPermissionChange(oldImage?: LookupTableItem, newImage?: LookupTableItem): boolean {
     
-    if (newImage?.itemType.startsWith('FirmAuthorisation')) {
+    if (newImage?.itemType === FirmAuthorisationLookupTableItem.ItemType) {
         
         const newStatusCode = (newImage as FirmAuthorisationLookupTableItem)?.currentAuthorisationStatusCode;
         const oldStatusCode = (oldImage as FirmAuthorisationLookupTableItem)?.currentAuthorisationStatusCode;
@@ -84,8 +84,8 @@ function isPermissionChange(oldImage?: LookupTableItem, newImage?: LookupTableIt
         return (newStatusCode) !== (oldStatusCode);
     }
 
-    if (newImage?.itemType.startsWith('FirmPrincipal-')
-        || newImage?.itemType.startsWith('RegulatedActivityPermissions-')) {
+    if (newImage?.itemType.startsWith(FirmPrincipalLookupTableItem.ItemTypePrefix)
+        || newImage?.itemType.startsWith(FirmPermissionsLookupTableItem.ItemTypePrefix)) {
         return true;
     }
 
@@ -105,7 +105,7 @@ async function publishPermissionChangeEvents(firmReference: string): Promise<voi
                 KeyConditionExpression: 'firmReference = :firmReference and begins_with(itemType, :itemType)',
                 ExpressionAttributeValues: {
                     ':firmReference': firmReference,
-                    ':itemType': 'FirmPrincipal-'
+                    ':itemType': FirmPrincipalLookupTableItem.ItemTypePrefix
                 }
             })
             .promise();

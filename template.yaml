@@ -266,7 +266,7 @@ Resources:
             TableName: !Ref IteratorTable
       Environment:
         Variables:
-          LOOKUP_TABLE_NAME: !Ref IteratorTable
+          ITERATOR_TABLE_NAME: !Ref IteratorTable
       Events:
         UnprocessedUpdateEvent:
           Type: SQS

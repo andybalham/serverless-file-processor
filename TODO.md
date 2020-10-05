@@ -8,42 +8,6 @@
     * Firm permissions (could be a DA or a principal)
     * Appointed Rep (could be new active or updated as inactive)
 
-For this, should we raise a new event on a new topic? I.e. 
-```
-class PermissionsChangedEvent {
-    firmReference: String
-}
-```
-We want to load all ARs for the firm and raise events for all those.
-
-Would we need anything more? The handler would do the following:
-
-* Load firm
-
-* If firm is not Authorised or EEA Authorised or Registered
-  * Set IsActiveMortgageFirm to be 'false'
-  * Return
-
-* If firm is Authorised or EEA Authorised
-  * Load permissions for firm
-  * If has mortgage permissions
-    * Set IsActiveMortgageFirm to be 'true'
-  * Else
-    * Set IsActiveMortgageFirm to be 'false'
-  * Return
-
-* Load principals for the firm
-
-* If no active principals
-  * Set IsActiveMortgageFirm to be 'false'
-  * Return
-
-If principal firm has mortgage permissions (i.e. 'authorised' and with permissions)
-  * Set IsActiveMortgageFirm to be 'true'
-  * Return
-
-* Set IsActiveMortgageFirm to be 'false'
-
 ## Future
 
 * Implement DLQ for failed updates

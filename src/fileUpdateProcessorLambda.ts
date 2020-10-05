@@ -1,7 +1,7 @@
 import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { FileUpdateMessage } from './FileUpdateMessage';
 import { FileType } from './FileType';
-import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNamesLookupTableItem, AlternativeFirmName, FirmPermissionsLookupTableItem, FirmPermission, FirmPrincipalLookupTableItem as FirmAppointedRepresentativeLookupTableItem, FirmAppointedRepresentativeLookupTableItem as FirmPrincipalLookupTableItemX } from './LookupTableItems';
+import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNamesLookupTableItem, AlternativeFirmName, FirmPermissionsLookupTableItem, FirmPermission, FirmAppointedRepresentativeLookupTableItem, FirmPrincipalLookupTableItem } from './LookupTableItems';
 import DynamoDB from 'aws-sdk/clients/dynamodb';
 import { parseLine } from './parsing';
 import { putItems } from './lookupTable';
@@ -67,26 +67,29 @@ function getDatabaseItems(updateMessage: FileUpdateMessage): LookupTableItem[] {
     return databaseItems;
 }
 
-function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<FirmAppointedRepresentativeLookupTableItem | FirmPrincipalLookupTableItemX> {
+function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<FirmAppointedRepresentativeLookupTableItem | FirmPrincipalLookupTableItem> {
 
     const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 9));
 
     const appointmentDataValues = dataValuesArray[0];
 
+    const appointedRepresentativeFirmRef = appointmentDataValues[0];
+    const principalFirmRef = appointmentDataValues[1];
+
     const firmAppointedRepresentative: FirmAppointedRepresentativeLookupTableItem = {
-        firmReference: appointmentDataValues[0],
-        itemType: `FirmAppointedRepresentative-${appointmentDataValues[1]}`,
-        principalFirmRef: appointmentDataValues[1],
+        firmReference: appointedRepresentativeFirmRef,
+        itemType: FirmAppointedRepresentativeLookupTableItem.getItemType(principalFirmRef),
+        principalFirmRef: principalFirmRef,
         statusCode: appointmentDataValues[2],
         statusEffectiveDate: getDateItemValue(appointmentDataValues[3]),
     };
 
     firmAppointedRepresentative.itemHash = LookupTableItem.getItemHash(firmAppointedRepresentative);
 
-    const firmPrincipal: FirmPrincipalLookupTableItemX = {
-        firmReference: appointmentDataValues[1],
-        itemType: `FirmPrincipal-${appointmentDataValues[0]}`,
-        appointedRepresentativeFirmRef: appointmentDataValues[0],
+    const firmPrincipal: FirmPrincipalLookupTableItem = {
+        firmReference: principalFirmRef,
+        itemType: FirmPrincipalLookupTableItem.getItemType(appointedRepresentativeFirmRef),
+        appointedRepresentativeFirmRef: appointedRepresentativeFirmRef,
         statusCode: firmAppointedRepresentative.statusCode,
         statusEffectiveDate: firmAppointedRepresentative.statusEffectiveDate,
     };
@@ -112,7 +115,7 @@ function getFirmPermissionDatabaseItems(updateMessage: FileUpdateMessage): FirmP
 
     const firmPermissionsDatabaseItem: FirmPermissionsLookupTableItem = {
         firmReference: dataValuesArray[0][0],
-        itemType: `RegulatedActivityPermissions-${dataValuesArray[0][1]}`,
+        itemType: FirmPermissionsLookupTableItem.getItemType(dataValuesArray[0][1]),
         regulatedActivityCode: dataValuesArray[0][1],
         permissions: getFirmPermissions(dataValuesArray)
     };
@@ -137,7 +140,7 @@ function getAlternativeFirmNameDatabaseItems(updateMessage: FileUpdateMessage): 
 
     const alternativeNamesDatabaseItem: AlternativeFirmNamesLookupTableItem = {
         firmReference: dataValuesArray[0][0],
-        itemType: 'AlternativeFirmNames',
+        itemType: AlternativeFirmNamesLookupTableItem.ItemType,
         names: getAlternativeNames(dataValuesArray)
     };
 
@@ -163,7 +166,7 @@ function getFirmsMasterListDatabaseItems(updateMessage: FileUpdateMessage): Firm
 
     const firmAuthorisationDatabaseItem: FirmAuthorisationLookupTableItem = {
         firmReference: firmAuthorisationValues[0],
-        itemType: 'FirmAuthorisation',
+        itemType: FirmAuthorisationLookupTableItem.ItemType,
         registeredFirmName: firmAuthorisationValues[1],
         addressLine1: getStringItemValue(firmAuthorisationValues[5]),
         addressLine2: getStringItemValue(firmAuthorisationValues[6]),

@@ -70,7 +70,7 @@ describe('File reading', () => {
         const expectedItems: FirmAuthorisationLookupTableItem[] = [
             {
                 firmReference: '100425',
-                itemType: 'FirmAuthorisation',
+                itemType: FirmAuthorisationLookupTableItem.ItemType,
                 registeredFirmName: 'Northern Financial Services Ltd',
                 addressLine1: 'Northern Financial Services Ltd',
                 addressLine2: 'The Square',
@@ -108,7 +108,7 @@ describe('File reading', () => {
         const expectedItems: AlternativeFirmNamesLookupTableItem[] = [
             {
                 firmReference: '100425',
-                itemType: 'AlternativeFirmNames',
+                itemType: AlternativeFirmNamesLookupTableItem.ItemType,
                 names: [
                     {
                         name: 'Tumeric Direct',
@@ -148,7 +148,7 @@ describe('File reading', () => {
         const expectedItems: FirmPermissionsLookupTableItem[] = [
             {
                 firmReference: '100013',
-                itemType: 'RegulatedActivityPermissions-14',
+                itemType: FirmPermissionsLookupTableItem.getItemType('14'),
                 regulatedActivityCode: '14',
                 permissions: [
                     {
@@ -190,14 +190,14 @@ describe('File reading', () => {
         const expectedItems: Array<FirmAppointedRepresentativeLookupTableItem | FirmPrincipalLookupTableItem> = [
             {
                 firmReference: '100014',
-                itemType: 'FirmPrincipal-117659',
+                itemType: FirmAppointedRepresentativeLookupTableItem.getItemType('117659'),
                 principalFirmRef: '117659',
                 statusCode: 'Withdrawn',
                 statusEffectiveDate: '2001-12-01'
             },
             {
                 firmReference: '117659',
-                itemType: 'FirmAppointedRepresentative-100014',
+                itemType: FirmPrincipalLookupTableItem.getItemType('100014'),
                 appointedRepresentativeFirmRef: '100014',
                 statusCode: 'Withdrawn',
                 statusEffectiveDate: '2001-12-01'

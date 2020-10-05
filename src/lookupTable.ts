@@ -1,5 +1,5 @@
 import { DocumentClient } from 'aws-sdk/clients/dynamodb';
-import { FirmAuthorisationLookupTableItem, LookupTableItem } from './LookupTableItems';
+import { FirmAppointedRepresentativeLookupTableItem, FirmAuthorisationLookupTableItem, LookupTableItem } from './LookupTableItems';
 
 export async function putItems(dynamoDbClient: DocumentClient, databaseItems: LookupTableItem[]): Promise<void> {
 
@@ -56,7 +56,7 @@ export async function getFirmAuthorisationItem(dynamoDbClient: DocumentClient, f
                 TableName: tableName(),
                 Key: {
                     firmReference: firmReference,
-                    itemType: 'FirmAuthorisation'
+                    itemType: FirmAuthorisationLookupTableItem.ItemType
                 }
             })
             .promise();
@@ -80,7 +80,7 @@ export async function getRegisteredPrincipalFirmAuthorisation(dynamoDbClient: Do
                 FilterExpression: 'statusCode = :statusCode',
                 ExpressionAttributeValues: {
                     ':firmReference': firmReference,
-                    ':itemType': 'FirmAppointedRepresentative-',
+                    ':itemType': FirmAppointedRepresentativeLookupTableItem.ItemTypePrefix,
                     ':statusCode': 'Registered'
                 }
             })

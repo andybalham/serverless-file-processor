@@ -3,6 +3,7 @@ import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import DynamoDB from 'aws-sdk/clients/dynamodb';
 import { interactiveDebug } from './debugUtils';
 import { LookupTableEventMessage } from './LookupTableEventMessage';
+import { AlternativeFirmNamesLookupTableItem, FirmAppointedRepresentativeLookupTableItem, FirmAuthorisationLookupTableItem, FirmPermissionsLookupTableItem } from './LookupTableItems';
 
 const dynamoDbClient = new DynamoDB.DocumentClient();
 
@@ -20,9 +21,17 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         console.log(`lookupTableEventMessage: ${JSON.stringify(lookupTableEventMessage)}`);
 
-        const itemTypeMatch = 
-            lookupTableEventMessage.itemType.match(
-                /^(?<iteratorType>(FirmAuthorisation|AlternativeFirmNames|FirmPrincipal|RegulatedActivityPermissions))(-(?<sortKeySuffix>.*))?$/);
+        const iteratorUpdateItemTypes: Array<string> = [
+            FirmAuthorisationLookupTableItem.ItemType,
+            AlternativeFirmNamesLookupTableItem.ItemType,
+            FirmAppointedRepresentativeLookupTableItem.ItemType,
+            FirmPermissionsLookupTableItem.ItemType
+        ];
+
+        const iteratorUpdateItemTypeRegExp = 
+            new RegExp(`^(?<iteratorType>(${iteratorUpdateItemTypes.join('|')}))(-(?<sortKeySuffix>.*))?$`);
+
+        const itemTypeMatch = lookupTableEventMessage.itemType.match(iteratorUpdateItemTypeRegExp);
 
         if (itemTypeMatch === null) {
             console.log(`Skipping itemType: ${lookupTableEventMessage.itemType}`);
@@ -38,7 +47,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
                 : `${lookupTableEventMessage.firmReference}-${(sortKeySuffix ?? 'undefined').padStart(6, '0')}`;
 
         const putParams: any = {
-            TableName: process.env.LOOKUP_TABLE_NAME,
+            TableName: process.env.ITERATOR_TABLE_NAME,
             Item: {
                 iteratorType: iteratorType,
                 sortKey: sortKey
