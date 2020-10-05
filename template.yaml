@@ -153,18 +153,18 @@ Resources:
       TopicName:
         Fn::Sub: ${ApplicationName}-lookup-table-event-topic
 
-  PermissionsUpdateEventTopic:
+  PermissionsChangedEventTopic:
     Type: AWS::SNS::Topic
     Properties:
       TopicName:
-        Fn::Sub: ${ApplicationName}-permission-update-event-topic
+        Fn::Sub: ${ApplicationName}-permission-changed-event-topic
 
   LookupTableEventProcessorFunction:
     Type: AWS::Serverless::Function
     DependsOn: 
       - LookupTable
       - LookupTableEventTopic
-      - PermissionsUpdateEventTopic
+      - PermissionsChangedEventTopic
     Properties:
       FunctionName: !Sub ${ApplicationName}-lookup-table-event-processor-function
       Handler: lookupTableEventProcessorLambda.handle
@@ -172,7 +172,7 @@ Resources:
       Environment:
         Variables:
           LOOKUP_TABLE_EVENT_TOPIC: !Ref LookupTableEventTopic
-          PERMISSIONS_UPDATE_EVENT_TOPIC: !Ref PermissionsUpdateEventTopic
+          PERMISSIONS_UPDATE_EVENT_TOPIC: !Ref PermissionsChangedEventTopic
           LOOKUP_TABLE_NAME: !Ref LookupTable
       Policies:
         - DynamoDBStreamReadPolicy:
@@ -183,7 +183,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref LookupTable
         - SNSPublishMessagePolicy:
-            TopicName: !GetAtt PermissionsUpdateEventTopic.TopicName
+            TopicName: !GetAtt PermissionsChangedEventTopic.TopicName
       Events:
         DatabaseEvent:
           Type: DynamoDB
@@ -275,30 +275,63 @@ Resources:
             BatchSize: 10
             Enabled: !Ref EnableSQS
 
+  PermissionsChangedQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${ApplicationName}-permissions-changed-queue
+      ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 60
+
+  PermissionsChangedQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    DependsOn: PermissionsChangedQueue
+    Properties: 
+      Queues: 
+        - !Ref PermissionsChangedQueue
+      PolicyDocument: 
+        Statement: 
+          - 
+            Action: 
+              - SQS:SendMessage
+            Effect: Allow
+            Resource: !GetAtt PermissionsChangedQueue.Arn
+            Principal:  
+              Service: sns.amazonaws.com
+
+  PermissionsChangedQueueSubscription:
+    Type: AWS::SNS::Subscription
+    DependsOn: 
+      - PermissionsChangedEventTopic
+      - PermissionsChangedQueue
+    Properties: 
+      Endpoint: !GetAtt PermissionsChangedQueue.Arn
+      Protocol: sqs
+      TopicArn: !Ref PermissionsChangedEventTopic
+
   PermissionChangedProcessorFunction:
     Type: AWS::Serverless::Function
     DependsOn:
-    #   - IteratorUpdateQueue
+      - PermissionsChangedQueue
       - LookupTable
     Properties:
       FunctionName: !Sub ${ApplicationName}-permission-changed-processor-function
-      Handler: permissionChangedProcessorLambda.handle
+      Handler: permissionsChangedProcessorLambda.handle
       Timeout: 10
       Policies:
-      #   - SQSPollerPolicy:
-      #       QueueName: !GetAtt IteratorUpdateQueue.QueueName
+        - SQSPollerPolicy:
+            QueueName: !GetAtt PermissionsChangedQueue.QueueName
         - DynamoDBCrudPolicy:
             TableName: !Ref LookupTable
       Environment:
         Variables:
           LOOKUP_TABLE_NAME: !Ref LookupTable
-      # Events:
-      #   UnprocessedUpdateEvent:
-      #     Type: SQS
-      #     Properties:
-      #       Queue: !GetAtt IteratorUpdateQueue.Arn
-      #       BatchSize: 10
-      #       Enabled: !Ref EnableSQS
+      Events:
+        UnprocessedUpdateEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt PermissionsChangedQueue.Arn
+            BatchSize: 10
+            Enabled: !Ref EnableSQS
 
   SearchUpdateQueue:
     Type: AWS::SQS::Queue

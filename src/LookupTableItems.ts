@@ -48,7 +48,7 @@ export class AlternativeFirmName {
 export class FirmPermissionsLookupTableItem extends LookupTableItem {
     
     static readonly ItemType = 'FirmPermissions'
-    static readonly ItemTypePrefix = `-${FirmPermissionsLookupTableItem.ItemType}`
+    static readonly ItemTypePrefix = FirmPermissionsLookupTableItem.ItemType + '-'
 
     static getItemType(regulatedActivityCode: string): string {
         return FirmPermissionsLookupTableItem.ItemTypePrefix + regulatedActivityCode;
@@ -68,7 +68,7 @@ export class FirmPermission {
 export class FirmPrincipalLookupTableItem extends LookupTableItem {
     
     static readonly ItemType = 'FirmPrincipal'
-    static readonly ItemTypePrefix = `-${FirmPrincipalLookupTableItem.ItemType}`
+    static readonly ItemTypePrefix = FirmPrincipalLookupTableItem.ItemType + '-'
 
     static getItemType(appointedRepresentativeFirmRef: string): string {
         return FirmPrincipalLookupTableItem.ItemTypePrefix + appointedRepresentativeFirmRef;
@@ -82,7 +82,7 @@ export class FirmPrincipalLookupTableItem extends LookupTableItem {
 export class FirmAppointedRepresentativeLookupTableItem extends LookupTableItem {
     
     static readonly ItemType = 'FirmAppointedRepresentative'
-    static readonly ItemTypePrefix = `-${FirmAppointedRepresentativeLookupTableItem.ItemType}`
+    static readonly ItemTypePrefix = FirmAppointedRepresentativeLookupTableItem.ItemType + '-'
 
     static getItemType(principalFirmRef: string): string {
         return FirmAppointedRepresentativeLookupTableItem.ItemTypePrefix + principalFirmRef;
@@ -96,6 +96,6 @@ export class FirmAppointedRepresentativeLookupTableItem extends LookupTableItem 
 export class IsActiveMortgageFirmLookupTableItem extends LookupTableItem {
 
     static readonly ItemType = 'IsActiveMortgageFirm'
-    
+
     isActiveMortgageFirm: boolean;
 }

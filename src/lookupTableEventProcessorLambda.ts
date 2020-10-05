@@ -4,9 +4,9 @@ import SNS, { PublishInput } from 'aws-sdk/clients/sns';
 import { FirmAuthorisationLookupTableItem, FirmPermissionsLookupTableItem, FirmPrincipalLookupTableItem, ILookupTableItemKeys, LookupTableItem } from './LookupTableItems';
 import { LookupTableEventMessage } from './LookupTableEventMessage';
 import { PermissionsChangedEventMessage } from './PermissionsChangedEventMessage';
+import { getFirmPrincipalLookupTableItems } from './lookupTable';
 
 const snsClient = new SNS;
-const dynamoDbClient = new DynamoDB.DocumentClient();
 
 export const handle = async (event: DynamoDBStreamEvent): Promise<any> => {
 
@@ -96,25 +96,10 @@ async function publishPermissionChangeEvents(firmReference: string): Promise<voi
 
     await publishPermissionChangeEvent(firmReference);
 
-    // TODO 03Oct20: We need to raise events for all appointed representatives
+    const firmPrincipalLookupTableItems = await getFirmPrincipalLookupTableItems(firmReference);
 
-    const principal =
-        await dynamoDbClient
-            .query({
-                TableName: process.env.LOOKUP_TABLE_NAME ?? '',
-                KeyConditionExpression: 'firmReference = :firmReference and begins_with(itemType, :itemType)',
-                ExpressionAttributeValues: {
-                    ':firmReference': firmReference,
-                    ':itemType': FirmPrincipalLookupTableItem.ItemTypePrefix
-                }
-            })
-            .promise();
-    
-    if (principal.Items !== undefined) {
-        for (let index = 0; index < principal.Items.length; index++) {
-            const principalItem = principal.Items[index];            
-            await publishPermissionChangeEvent(principalItem.appointedRepresentativeFirmRef);
-        }
+    for (const firmPrincipalLookupTableItem of firmPrincipalLookupTableItems) {
+        await publishPermissionChangeEvent(firmPrincipalLookupTableItem.appointedRepresentativeFirmRef);        
     }
 }
 

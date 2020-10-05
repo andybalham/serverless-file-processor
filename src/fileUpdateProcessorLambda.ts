@@ -2,11 +2,8 @@ import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { FileUpdateMessage } from './FileUpdateMessage';
 import { FileType } from './FileType';
 import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNamesLookupTableItem, AlternativeFirmName, FirmPermissionsLookupTableItem, FirmPermission, FirmAppointedRepresentativeLookupTableItem, FirmPrincipalLookupTableItem } from './LookupTableItems';
-import DynamoDB from 'aws-sdk/clients/dynamodb';
 import { parseLine } from './parsing';
-import { putItems } from './lookupTable';
-
-const dynamoDbClient = new DynamoDB.DocumentClient();
+import { putLookupTableItems } from './lookupTable';
 
 export const handle = async (event: SQSEvent): Promise<any> => {
 
@@ -18,8 +15,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         const updateMessage: FileUpdateMessage = JSON.parse(sqsEventRecord.body);
 
-        await processUpdateMessage(
-            updateMessage, databaseItems => putItems(dynamoDbClient, databaseItems));
+        await processUpdateMessage(updateMessage, databaseItems => putLookupTableItems(databaseItems));
 
         console.log(`sqsEventRecord: ${JSON.stringify(sqsEventRecord)}`);
     }

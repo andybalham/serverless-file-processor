@@ -1,7 +1,14 @@
-import { DocumentClient } from 'aws-sdk/clients/dynamodb';
-import { FirmAppointedRepresentativeLookupTableItem, FirmAuthorisationLookupTableItem, LookupTableItem } from './LookupTableItems';
+import DynamoDB from 'aws-sdk/clients/dynamodb';
+import { FirmAppointedRepresentativeLookupTableItem, FirmAuthorisationLookupTableItem, FirmPrincipalLookupTableItem, LookupTableItem } from './LookupTableItems';
 
-export async function putItems(dynamoDbClient: DocumentClient, databaseItems: LookupTableItem[]): Promise<void> {
+const dynamoDbClient = new DynamoDB.DocumentClient();
+
+function tableName(): string {
+    if (process.env.LOOKUP_TABLE_NAME === undefined) throw new Error('process.env.LOOKUP_TABLE_NAME === undefined');
+    return process.env.LOOKUP_TABLE_NAME;
+}
+
+export async function putLookupTableItems(databaseItems: LookupTableItem[]): Promise<void> {
 
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#transactWrite-property
     // https://www.alexdebrie.com/posts/dynamodb-transactions/
@@ -48,7 +55,7 @@ export async function putItems(dynamoDbClient: DocumentClient, databaseItems: Lo
     // console.log(`databaseItems: ${JSON.stringify(databaseItems)}`);
 }
 
-export async function getFirmAuthorisationItem(dynamoDbClient: DocumentClient, firmReference: string): Promise<FirmAuthorisationLookupTableItem | undefined> {
+export async function getFirmAuthorisationItem(firmReference: string): Promise<FirmAuthorisationLookupTableItem | undefined> {
 
     const itemOutput =
         await dynamoDbClient
@@ -68,7 +75,7 @@ export async function getFirmAuthorisationItem(dynamoDbClient: DocumentClient, f
         : itemOutput.Item as FirmAuthorisationLookupTableItem;
 }
 
-export async function getRegisteredPrincipalFirmAuthorisation(dynamoDbClient: DocumentClient, firmReference: string): Promise<FirmAuthorisationLookupTableItem | undefined> {
+export async function getRegisteredPrincipalFirmAuthorisation(firmReference: string): Promise<FirmAuthorisationLookupTableItem | undefined> {
 
     // Find registered principal
 
@@ -92,13 +99,33 @@ export async function getRegisteredPrincipalFirmAuthorisation(dynamoDbClient: Do
 
     // Load the principal firm authorisation
 
+    const firmAppointedRepresentativeLookupTableItem = appointedRepresentative.Items[0] as FirmAppointedRepresentativeLookupTableItem;
+
     const registeredPrincipalFirmAuthorisation = 
-        await getFirmAuthorisationItem(dynamoDbClient, appointedRepresentative.Items[0].principalFirmRef);
+        await getFirmAuthorisationItem(firmAppointedRepresentativeLookupTableItem.principalFirmRef);
 
     return registeredPrincipalFirmAuthorisation;
 }
 
-function tableName(): string {
-    if (process.env.LOOKUP_TABLE_NAME === undefined) throw new Error('process.env.LOOKUP_TABLE_NAME === undefined');
-    return process.env.LOOKUP_TABLE_NAME;
+export async function getFirmPrincipalLookupTableItems(firmReference: string): Promise<FirmPrincipalLookupTableItem[]> {
+
+    const principalQueryOutput =
+        await dynamoDbClient
+            .query({
+                TableName: process.env.LOOKUP_TABLE_NAME ?? '',
+                KeyConditionExpression: 'firmReference = :firmReference and begins_with(itemType, :itemType)',
+                ExpressionAttributeValues: {
+                    ':firmReference': firmReference,
+                    ':itemType': FirmPrincipalLookupTableItem.ItemTypePrefix
+                }
+            })
+            .promise();
+
+    console.log(`principalQueryOutput.Items?.length: ${principalQueryOutput.Items?.length}`);
+    
+    if (principalQueryOutput.Items === undefined) {
+        return [];
+    }
+
+    return principalQueryOutput.Items.map(i => i as FirmPrincipalLookupTableItem);
 }
