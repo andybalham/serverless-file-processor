@@ -10,6 +10,8 @@
 
 ## Future
 
+* For IsMortgageFirm updates, process batches of update events and filter out duplicates
+
 * Implement DLQ for failed updates
 
 * Change to read before update with optimistic locking of database items?

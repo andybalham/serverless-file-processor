@@ -5,14 +5,19 @@ export interface ILookupTableItemKeys {
     itemType: string;
 }
 
-export abstract class LookupTableItem implements ILookupTableItemKeys {
+export interface ILookupTableItem extends ILookupTableItemKeys {
+    itemHash?: string;
+}
+
+export abstract class LookupTableItem implements ILookupTableItem {
 
     firmReference: string;
     itemType: string;
     itemHash?: string;
 
-    static getItemHash(item: LookupTableItem): string {
-        return hash(item, { unorderedArrays: true });
+    static setItemHash(item: LookupTableItem): void {        
+        item.itemHash = undefined;
+        item.itemHash = hash(item, { unorderedArrays: true });
     }
 }
 

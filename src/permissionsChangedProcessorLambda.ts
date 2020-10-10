@@ -1,8 +1,8 @@
 import { SNSMessage } from 'aws-lambda';
 import { SQSEvent } from 'aws-lambda/trigger/sqs';
 
-import { getFirmAuthorisationItem as getFirmAuthorisation, getRegisteredPrincipalFirmAuthorisation, putLookupTableItems } from './lookupTable';
-import { FirmAuthorisationLookupTableItem, IsActiveMortgageFirmLookupTableItem, LookupTableItem } from './LookupTableItems';
+import * as LookupTable from './lookupTable';
+import { FirmAuthorisationLookupTableItem, IsActiveMortgageFirmLookupTableItem } from './LookupTableItems';
 import { PermissionsChangedEventMessage } from './PermissionsChangedEventMessage';
 
 export const handle = async (event: SQSEvent): Promise<any> => {
@@ -22,12 +22,10 @@ export const handle = async (event: SQSEvent): Promise<any> => {
             itemType: IsActiveMortgageFirmLookupTableItem.ItemType,
             isActiveMortgageFirm: await isActiveMortgageFirm(permissionsChangedEventMessage.firmReference)
         };
-    
-        isActiveMortgageFirmLookupTableItem.itemHash = LookupTableItem.getItemHash(isActiveMortgageFirmLookupTableItem);
 
         console.log(`putting isActiveMortgageFirmLookupTableItem: ${JSON.stringify(isActiveMortgageFirmLookupTableItem)}`);
 
-        await putLookupTableItems([isActiveMortgageFirmLookupTableItem]);            
+        await LookupTable.putItems([isActiveMortgageFirmLookupTableItem]);            
     }
 
     console.log('Exiting');
@@ -35,7 +33,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
 async function isActiveMortgageFirm(firmReference: string): Promise<boolean> {
 
-    const firmAuthorisation = await getFirmAuthorisation(firmReference);
+    const firmAuthorisation = await LookupTable.getFirmAuthorisation(firmReference);
 
     if (firmAuthorisation === undefined) {
         console.error((`No FirmAuthorisationLookupTableItem found for firmReference: ${firmReference}`));
@@ -49,7 +47,7 @@ async function isActiveMortgageFirm(firmReference: string): Promise<boolean> {
     if (firmAuthorisation.currentAuthorisationStatusCode === 'Registered') {
 
         const registeredPrincipalFirmAuthorisation = 
-            await getRegisteredPrincipalFirmAuthorisation(firmReference);
+            await LookupTable.getRegisteredPrincipalFirmAuthorisation(firmReference);
 
         if (registeredPrincipalFirmAuthorisation === undefined) {
             return false;

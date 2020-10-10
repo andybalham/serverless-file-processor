@@ -4,7 +4,7 @@ import SNS, { PublishInput } from 'aws-sdk/clients/sns';
 import { FirmAuthorisationLookupTableItem, FirmPermissionsLookupTableItem, FirmPrincipalLookupTableItem, ILookupTableItemKeys, LookupTableItem } from './LookupTableItems';
 import { LookupTableEventMessage } from './LookupTableEventMessage';
 import { PermissionsChangedEventMessage } from './PermissionsChangedEventMessage';
-import { getFirmPrincipalLookupTableItems } from './lookupTable';
+import * as LookupTable from './lookupTable';
 
 const snsClient = new SNS;
 
@@ -96,7 +96,7 @@ async function publishPermissionChangeEvents(firmReference: string): Promise<voi
 
     await publishPermissionChangeEvent(firmReference);
 
-    const firmPrincipalLookupTableItems = await getFirmPrincipalLookupTableItems(firmReference);
+    const firmPrincipalLookupTableItems = await LookupTable.getFirmPrincipals(firmReference);
 
     for (const firmPrincipalLookupTableItem of firmPrincipalLookupTableItems) {
         await publishPermissionChangeEvent(firmPrincipalLookupTableItem.appointedRepresentativeFirmRef);        

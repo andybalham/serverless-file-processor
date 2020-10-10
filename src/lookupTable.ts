@@ -1,5 +1,5 @@
-import DynamoDB from 'aws-sdk/clients/dynamodb';
-import { FirmAppointedRepresentativeLookupTableItem, FirmAuthorisationLookupTableItem, FirmPrincipalLookupTableItem, LookupTableItem } from './LookupTableItems';
+import DynamoDB, { DocumentClient } from 'aws-sdk/clients/dynamodb';
+import { FirmAppointedRepresentativeLookupTableItem, FirmAuthorisationLookupTableItem, FirmPrincipalLookupTableItem, ILookupTableItem, LookupTableItem } from './LookupTableItems';
 
 const dynamoDbClient = new DynamoDB.DocumentClient();
 
@@ -8,24 +8,79 @@ function tableName(): string {
     return process.env.LOOKUP_TABLE_NAME;
 }
 
-export async function putLookupTableItems(databaseItems: LookupTableItem[]): Promise<void> {
+export async function putItems(databaseItems: LookupTableItem[]): Promise<void> {
 
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#transactWrite-property
     // https://www.alexdebrie.com/posts/dynamodb-transactions/
     // https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html
 
+    /*
+    For optimistic locking:
+    * Get the item
+    * If the item exists then put with a condition and a version increment
+    * If the item doesn't exist then put with a condition of ??? "attribute_not_exists(Id)"
+    */
+
     // TODO 19Sep20: Avoid using transactions for single updates
     
+    const batchGetParams: DocumentClient.BatchGetItemInput = { RequestItems: {}};
+    batchGetParams.RequestItems[tableName()] = { 
+        Keys: databaseItems.map(item => {
+            return { firmReference: item.firmReference, itemType: item.itemType };
+        }),
+        AttributesToGet: [
+            'firmReference', 'itemType', 'itemHash'
+        ]
+    };
+    
+    const batchGetResponse = await dynamoDbClient.batchGet(batchGetParams).promise();
+
+    if (batchGetResponse.Responses === undefined) throw new Error('batchGetResponse.Responses === undefined');
+
+    const tableResponses = batchGetResponse.Responses[tableName()];
+
+    const currentItemHashes = new Map<string, string | undefined>();    
+    tableResponses
+        .forEach((item, index) => 
+        {
+            const itemHashKey = getItemHashKey(item as ILookupTableItem);
+            currentItemHashes.set(itemHashKey, item.itemHash);
+        });
+
+    console.log(`currentItemHashes: ${JSON.stringify(Array.from(currentItemHashes.entries()))}`);
+    
+    databaseItems.forEach(item => LookupTableItem.setItemHash(item));
+
     const putItems = databaseItems.map(item => { 
-        return {
-            Put: {
-                TableName: tableName(),
-                Item: item,
-                ConditionExpression: 'itemHash <> :itemHash',
-                ExpressionAttributeValues: { ':itemHash': item.itemHash},
-                ReturnValuesOnConditionCheckFailure: 'NONE'
-            }
-        };
+
+        const currentItemHash = currentItemHashes.get(getItemHashKey(item));
+
+        let putItem: any;
+        if (currentItemHash === undefined) {
+        
+            putItem = {
+                Put: {
+                    TableName: tableName(),
+                    Item: item,
+                    ConditionExpression: 'attribute_not_exists(itemHash)',
+                    ReturnValuesOnConditionCheckFailure: 'NONE'
+                }
+            };
+
+        } else {
+
+            putItem = {
+                Put: {
+                    TableName: tableName(),
+                    Item: item,
+                    ConditionExpression: 'itemHash = :currentItemHash',
+                    ExpressionAttributeValues: { ':currentItemHash': currentItemHash},
+                    ReturnValuesOnConditionCheckFailure: 'NONE'
+                }
+            };    
+        }
+
+        return putItem;
     });
 
     const params = {
@@ -38,24 +93,20 @@ export async function putLookupTableItems(databaseItems: LookupTableItem[]): Pro
 
     } catch (error) {
         
-        if (error instanceof Error) {
-            
-            console.log(`error.message: ${error.message}`);
-
-            if (!error.message.includes('ConditionalCheckFailed')) {
-                console.error('TODO: How should we handle this error?');
-                // throw error;
-            }
-
+        if (error instanceof Error) {            
+            console.error(`error.message: ${error.message}`);
         } else {
             throw error;
         }
     }
     
-    // console.log(`databaseItems: ${JSON.stringify(databaseItems)}`);
+
+    function getItemHashKey(item: ILookupTableItem): string {
+        return `${item.firmReference}||${item.itemType}`;
+    }
 }
 
-export async function getFirmAuthorisationItem(firmReference: string): Promise<FirmAuthorisationLookupTableItem | undefined> {
+export async function getFirmAuthorisation(firmReference: string): Promise<FirmAuthorisationLookupTableItem | undefined> {
 
     const itemOutput =
         await dynamoDbClient
@@ -102,12 +153,12 @@ export async function getRegisteredPrincipalFirmAuthorisation(firmReference: str
     const firmAppointedRepresentativeLookupTableItem = appointedRepresentative.Items[0] as FirmAppointedRepresentativeLookupTableItem;
 
     const registeredPrincipalFirmAuthorisation = 
-        await getFirmAuthorisationItem(firmAppointedRepresentativeLookupTableItem.principalFirmRef);
+        await getFirmAuthorisation(firmAppointedRepresentativeLookupTableItem.principalFirmRef);
 
     return registeredPrincipalFirmAuthorisation;
 }
 
-export async function getFirmPrincipalLookupTableItems(firmReference: string): Promise<FirmPrincipalLookupTableItem[]> {
+export async function getFirmPrincipals(firmReference: string): Promise<FirmPrincipalLookupTableItem[]> {
 
     const principalQueryOutput =
         await dynamoDbClient

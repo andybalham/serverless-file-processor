@@ -3,7 +3,7 @@ import { FileUpdateMessage } from './FileUpdateMessage';
 import { FileType } from './FileType';
 import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNamesLookupTableItem, AlternativeFirmName, FirmPermissionsLookupTableItem, FirmPermission, FirmAppointedRepresentativeLookupTableItem, FirmPrincipalLookupTableItem } from './LookupTableItems';
 import { parseLine } from './parsing';
-import { putLookupTableItems } from './lookupTable';
+import * as LookupTable from './lookupTable';
 
 export const handle = async (event: SQSEvent): Promise<any> => {
 
@@ -15,7 +15,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         const updateMessage: FileUpdateMessage = JSON.parse(sqsEventRecord.body);
 
-        await processUpdateMessage(updateMessage, databaseItems => putLookupTableItems(databaseItems));
+        await processUpdateMessage(updateMessage, databaseItems => LookupTable.putItems(databaseItems));
 
         console.log(`sqsEventRecord: ${JSON.stringify(sqsEventRecord)}`);
     }
@@ -80,8 +80,6 @@ function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<Fi
         statusEffectiveDate: getDateItemValue(appointmentDataValues[3]),
     };
 
-    firmAppointedRepresentative.itemHash = LookupTableItem.getItemHash(firmAppointedRepresentative);
-
     const firmPrincipal: FirmPrincipalLookupTableItem = {
         firmReference: principalFirmRef,
         itemType: FirmPrincipalLookupTableItem.getItemType(appointedRepresentativeFirmRef),
@@ -89,8 +87,6 @@ function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<Fi
         statusCode: firmAppointedRepresentative.statusCode,
         statusEffectiveDate: firmAppointedRepresentative.statusEffectiveDate,
     };
-
-    firmPrincipal.itemHash = LookupTableItem.getItemHash(firmPrincipal);
 
     return [firmAppointedRepresentative, firmPrincipal];
 }
@@ -116,8 +112,6 @@ function getFirmPermissionDatabaseItems(updateMessage: FileUpdateMessage): FirmP
         permissions: getFirmPermissions(dataValuesArray)
     };
 
-    firmPermissionsDatabaseItem.itemHash = LookupTableItem.getItemHash(firmPermissionsDatabaseItem);
-
     return [firmPermissionsDatabaseItem];
 }
 
@@ -139,8 +133,6 @@ function getAlternativeFirmNameDatabaseItems(updateMessage: FileUpdateMessage): 
         itemType: AlternativeFirmNamesLookupTableItem.ItemType,
         names: getAlternativeNames(dataValuesArray)
     };
-
-    alternativeNamesDatabaseItem.itemHash = LookupTableItem.getItemHash(alternativeNamesDatabaseItem);
 
     return [alternativeNamesDatabaseItem];
 }
@@ -174,8 +166,6 @@ function getFirmsMasterListDatabaseItems(updateMessage: FileUpdateMessage): Firm
         postcodeOut: getStringItemValue(firmAuthorisationValues[12]),
         currentAuthorisationStatusCode: firmAuthorisationValues[19],
     };
-
-    firmAuthorisationDatabaseItem.itemHash = LookupTableItem.getItemHash(firmAuthorisationDatabaseItem);
 
     return [firmAuthorisationDatabaseItem];
 }
