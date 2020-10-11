@@ -13,11 +13,11 @@ export const handle = async (event: SQSEvent): Promise<any> => {
         
         const sqsEventRecord = event.Records[recordIndex];
 
+        console.log(`sqsEventRecord: ${JSON.stringify(sqsEventRecord)}`);
+
         const updateMessage: FileUpdateMessage = JSON.parse(sqsEventRecord.body);
 
         await processUpdateMessage(updateMessage, databaseItems => LookupTable.putItems(databaseItems));
-
-        console.log(`sqsEventRecord: ${JSON.stringify(sqsEventRecord)}`);
     }
     
     console.log('Exiting');

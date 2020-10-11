@@ -50,41 +50,54 @@ export async function putItems(databaseItems: LookupTableItem[]): Promise<void> 
     console.log(`currentItemHashes: ${JSON.stringify(Array.from(currentItemHashes.entries()))}`);
     
     databaseItems.forEach(item => LookupTableItem.setItemHash(item));
-
+    
     const putItems = databaseItems.map(item => { 
 
-        const currentItemHash = currentItemHashes.get(getItemHashKey(item));
+        const itemHashKey = getItemHashKey(item);
+        const currentItemHash = currentItemHashes.get(itemHashKey);
 
         let putItem: any;
         if (currentItemHash === undefined) {
         
-            putItem = {
-                Put: {
-                    TableName: tableName(),
-                    Item: item,
-                    ConditionExpression: 'attribute_not_exists(itemHash)',
-                    ReturnValuesOnConditionCheckFailure: 'NONE'
-                }
-            };
+            putItem = 
+                {
+                    Put: {
+                        TableName: tableName(),
+                        Item: item,
+                        ConditionExpression: 'attribute_not_exists(itemHash)',
+                        ReturnValuesOnConditionCheckFailure: 'NONE'
+                    }
+                };
 
         } else {
 
-            putItem = {
-                Put: {
-                    TableName: tableName(),
-                    Item: item,
-                    ConditionExpression: 'itemHash = :currentItemHash',
-                    ExpressionAttributeValues: { ':currentItemHash': currentItemHash},
-                    ReturnValuesOnConditionCheckFailure: 'NONE'
-                }
-            };    
+            if (item.itemHash === currentItemHash) {
+                console.log(`item.itemHash === currentItemHash, so skipping item ${itemHashKey}`);
+            } else {
+                putItem = 
+                    {
+                        Put: {
+                            TableName: tableName(),
+                            Item: item,
+                            ConditionExpression: 'itemHash = :currentItemHash',
+                            ExpressionAttributeValues: { ':currentItemHash': currentItemHash},
+                            ReturnValuesOnConditionCheckFailure: 'NONE'
+                        }
+                    };    
+            }
         }
 
         return putItem;
     });
 
+    const definedPutItems = putItems.filter(item => item !== undefined);
+
+    if (definedPutItems.length === 0) {
+        return;
+    }
+
     const params = {
-        TransactItems: putItems
+        TransactItems: definedPutItems
     };
 
     try {
