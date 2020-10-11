@@ -65,12 +65,24 @@ Resources:
             Principal:  
               Service: s3.amazonaws.com
 
+  FailedFileUpdateQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${ApplicationName}-failed-file-update-queue
+      ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 18
+
   UnprocessedFileUpdateQueue:
     Type: AWS::SQS::Queue
+    DependsOn:
+      - FailedFileUpdateQueue
     Properties:
       QueueName: !Sub ${ApplicationName}-unprocessed-file-update-queue
       ReceiveMessageWaitTimeSeconds: 20
       VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt FailedFileUpdateQueue.Arn
+        maxReceiveCount: 1
 
   FileProcessorFunction:
     Type: AWS::Serverless::Function

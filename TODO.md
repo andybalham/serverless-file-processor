@@ -2,19 +2,14 @@
 
 ## Next
 
-* Use events to keep an 'IsMortgageFirm' flag correct, i.e. on permission change, check if a principal, if so then update the ARs
-  * Need to pick up changes to:
-    * Firm authorisation (could be a DA, a principal or an AR)
-    * Firm permissions (could be a DA or a principal)
-    * Appointed Rep (could be new active or updated as inactive)
+* Implement DLQ for failed updates
+  * Don't use DLQ, but destinations instead: https://aws.amazon.com/blogs/compute/introducing-aws-lambda-destinations/
 
 ## Future
 
 * For IsMortgageFirm updates, process batches of update events and filter out duplicates
 
-* Implement DLQ for failed updates
-
-* Change to read before update with optimistic locking of database items?
+* Extend the GraphQL api to include IsMortgageFirm
 
 * Retrieve extra info from FCA API, i.e. website
   * Should this info be a separate db item?
@@ -25,7 +20,8 @@
   * I.e. refresh permissions from the FCA
 
 * Turn SNS events into SQS jobs:
-  * Export to a new 'Iterator Table' and an AppSync query to get blocks from it
+  * ~~Export to a new 'Iterator Table'~~
+  * Have an AppSync query to get blocks from it
 
 * Export to [Amazon Elasticsearch](https://docs.aws.amazon.com/elasticsearch-service/index.html) to do search by name and location
     * [Loading Streaming Data into Amazon ES from Amazon DynamoDB](https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-aws-integrations.html#es-aws-integrations-dynamodb-es)
@@ -42,6 +38,7 @@
 * GSI usage for iterating in a sorted manner
   * [Is there a DynamoDB max partition size of 10GB for a single partition key value?](https://stackoverflow.com/questions/40272600/is-there-a-dynamodb-max-partition-size-of-10gb-for-a-single-partition-key-value#40277185)
   * Perhaps a better solution would be to have a separate table
+  * A separate table would mean that you can iterate without any impact on the main lookup
 
 * Investigate [NoSQL Workbench for DynamoDB GUI Client](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/workbench.html)
 
@@ -69,3 +66,12 @@
 * Hook lambda to table updates and raise SNS events
   * [DynamoDB Streams and AWS Lambda Triggers](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Streams.Lambda.html)
   * https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-dynamodb-table.html#cfn-dynamodb-table-streamspecification
+
+* Change to read before update with optimistic locking of database items?
+
+* Use events to keep an 'IsMortgageFirm' flag correct, i.e. on permission change, check if a principal, if so then update the ARs
+  * Need to pick up changes to:
+    * Firm authorisation (could be a DA, a principal or an AR)
+    * Firm permissions (could be a DA or a principal)
+    * Appointed Rep (could be new active or updated as inactive)
+

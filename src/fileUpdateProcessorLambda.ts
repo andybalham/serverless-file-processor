@@ -4,6 +4,7 @@ import { FileType } from './FileType';
 import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNamesLookupTableItem, AlternativeFirmName, FirmPermissionsLookupTableItem, FirmPermission, FirmAppointedRepresentativeLookupTableItem, FirmPrincipalLookupTableItem } from './LookupTableItems';
 import { parseLine } from './parsing';
 import * as LookupTable from './lookupTable';
+import dayjs from 'dayjs';
 
 export const handle = async (event: SQSEvent): Promise<any> => {
 
@@ -77,7 +78,7 @@ function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<Fi
         itemType: FirmAppointedRepresentativeLookupTableItem.getItemType(principalFirmRef),
         principalFirmRef: principalFirmRef,
         statusCode: appointmentDataValues[2],
-        statusEffectiveDate: getDateItemValue(appointmentDataValues[3]),
+        statusEffectiveDate: getDateItemValue(appointmentDataValues[3], 'statusEffectiveDate'),
     };
 
     const firmPrincipal: FirmPrincipalLookupTableItem = {
@@ -101,7 +102,7 @@ function getFirmPermissionDatabaseItems(updateMessage: FileUpdateMessage): FirmP
                 investmentTypeCode: getStringItemValue(firmPermissionValues[2]),
                 customerTypeCode: getStringItemValue(firmPermissionValues[3]),
                 statusCode: firmPermissionValues[4],
-                effectiveDate: getDateItemValue(firmPermissionValues[5]),
+                effectiveDate: getDateItemValue(firmPermissionValues[5], 'effectiveDate'),
             };
         });
 
@@ -123,8 +124,8 @@ function getAlternativeFirmNameDatabaseItems(updateMessage: FileUpdateMessage): 
         dataValuesArray.map(alternativeNameValues => {
             return {
                 name: alternativeNameValues[1],
-                effectiveDate: getDateItemValue(alternativeNameValues[3]),
-                endDate: getOptionalDateItemValue(alternativeNameValues[4]),
+                effectiveDate: getDateItemValue(alternativeNameValues[3], 'effectiveDate'),
+                endDate: getOptionalDateItemValue(alternativeNameValues[4], 'endDate'),
             };
         });
 
@@ -137,13 +138,21 @@ function getAlternativeFirmNameDatabaseItems(updateMessage: FileUpdateMessage): 
     return [alternativeNamesDatabaseItem];
 }
 
-function getDateItemValue(dateString: string): string {    
+function getDateItemValue(dateString: string, attributeName: string): string {
+
     const formattedDateString = `${dateString.slice(0, 4)}-${dateString.slice(4, 6)}-${dateString.slice(6, 8)}`;
-    return formattedDateString;
+
+    const dayJsDate = dayjs(formattedDateString);
+
+    if (!dayJsDate.isValid()) {
+        throw new Error(`The value for ${attributeName} could not be formatted as a date: ${dateString}`);
+    }
+
+    return dayJsDate.format('YYYY-MM-DD');
 }
 
-function getOptionalDateItemValue(dateString: string): string | undefined {
-    return (dateString === '') ? undefined : getDateItemValue(dateString);
+function getOptionalDateItemValue(dateString: string, attributeName: string): string | undefined {
+    return (dateString === '') ? undefined : getDateItemValue(dateString, attributeName);
 }
 
 function getFirmsMasterListDatabaseItems(updateMessage: FileUpdateMessage): FirmAuthorisationLookupTableItem[] {
@@ -165,6 +174,7 @@ function getFirmsMasterListDatabaseItems(updateMessage: FileUpdateMessage): Firm
         postcodeIn: getStringItemValue(firmAuthorisationValues[11]),
         postcodeOut: getStringItemValue(firmAuthorisationValues[12]),
         currentAuthorisationStatusCode: firmAuthorisationValues[19],
+        dateStatusLastChanged: getDateItemValue(firmAuthorisationValues[20], 'dateStatusLastChanged'),
     };
 
     return [firmAuthorisationDatabaseItem];
@@ -173,3 +183,4 @@ function getFirmsMasterListDatabaseItems(updateMessage: FileUpdateMessage): Firm
 function getStringItemValue(fileValue: string): string | undefined {
     return fileValue === '' ? undefined : fileValue;
 }
+

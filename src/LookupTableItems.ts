@@ -35,6 +35,7 @@ export class FirmAuthorisationLookupTableItem extends LookupTableItem {
     postcodeIn?: string;
     postcodeOut?: string;
     currentAuthorisationStatusCode: string;
+    dateStatusLastChanged: string;
 }
 
 export class AlternativeFirmNamesLookupTableItem extends LookupTableItem {
