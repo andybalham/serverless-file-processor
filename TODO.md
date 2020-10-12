@@ -2,19 +2,16 @@
 
 ## Next
 
-* Implement DLQ for failed updates
-  * Don't use DLQ, but destinations instead: https://aws.amazon.com/blogs/compute/introducing-aws-lambda-destinations/
+* Extend the GraphQL api to include IsMortgageFirm
 
 ## Future
-
-* For IsMortgageFirm updates, process batches of update events and filter out duplicates
-
-* Extend the GraphQL api to include IsMortgageFirm
 
 * Retrieve extra info from FCA API, i.e. website
   * Should this info be a separate db item?
   * We wouldn't want a separate event => infinite loop
   * How would we merge the db items in the API? E.g. FirmAuthorisation and FirmAuthorisation_Ext
+
+* Don't use transactions when only one update
 
 * Add a priority update queue written to by GraphQL API
   * I.e. refresh permissions from the FCA
@@ -25,11 +22,6 @@
 
 * Export to [Amazon Elasticsearch](https://docs.aws.amazon.com/elasticsearch-service/index.html) to do search by name and location
     * [Loading Streaming Data into Amazon ES from Amazon DynamoDB](https://docs.aws.amazon.com/elasticsearch-service/latest/developerguide/es-aws-integrations.html#es-aws-integrations-dynamodb-es)
-
-* Add versioning to the database items (e.g. \_v0 or should that be v0\_, see [Sort Key Design](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-sort-keys.html))
-  * Have a second table just for historical data
-
-* Don't use transactions when only one update
 
 * Try 1% of the volume
 
@@ -44,6 +36,9 @@
 
 * Look at local AppSync development
   * [Developing and testing GraphQL APIs, Storage and Functions with Amplify Framework Local Mocking features](https://aws.amazon.com/blogs/mobile/amplify-framework-local-mocking/)
+
+* Add versioning to the database items (e.g. \_v0 or should that be v0\_, see [Sort Key Design](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-sort-keys.html))
+  * Have a second table just for historical data
 
 ## Done
 
@@ -74,4 +69,10 @@
     * Firm authorisation (could be a DA, a principal or an AR)
     * Firm permissions (could be a DA or a principal)
     * Appointed Rep (could be new active or updated as inactive)
+
+* Implement DLQ for failed updates
+  * Don't use DLQ, but destinations instead: https://aws.amazon.com/blogs/compute/introducing-aws-lambda-destinations/
+  * Destinations are only available for asynchronous calls to Lambdas
+
+* For IsMortgageFirm updates, process batches of update events and filter out duplicates
 

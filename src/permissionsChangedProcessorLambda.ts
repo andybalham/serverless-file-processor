@@ -9,6 +9,8 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
     console.log(`event: ${JSON.stringify(event)}`);
 
+    const firmReferenceSet = new Set<string>();
+
     for (const sqsEventRecord of event.Records) {
 
         const snsMessage: SNSMessage = JSON.parse(sqsEventRecord.body);
@@ -17,21 +19,28 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         const permissionsChangedEventMessage = JSON.parse(snsMessage.Message) as PermissionsChangedEventMessage;
 
-        const isActiveMortgageFirmLookupTableItem: IsActiveMortgageFirmLookupTableItem = {
-            firmReference: permissionsChangedEventMessage.firmReference,
-            itemType: IsActiveMortgageFirmLookupTableItem.ItemType,
-            isActiveMortgageFirm: await isActiveMortgageFirm(permissionsChangedEventMessage.firmReference)
-        };
-
-        console.log(`putting isActiveMortgageFirmLookupTableItem: ${JSON.stringify(isActiveMortgageFirmLookupTableItem)}`);
-
-        await LookupTable.putItems([isActiveMortgageFirmLookupTableItem]);            
+        firmReferenceSet.add(permissionsChangedEventMessage.firmReference);
     }
 
+    for (const firmReference of firmReferenceSet.keys()) {
+
+        const isActiveMortgageFirm = await getIsActiveMortgageFirm(firmReference);
+
+        const isActiveMortgageFirmLookupTableItem: IsActiveMortgageFirmLookupTableItem = {
+            firmReference: firmReference,
+            itemType: IsActiveMortgageFirmLookupTableItem.ItemType,
+            isActiveMortgageFirm: isActiveMortgageFirm
+        };
+
+        console.log(`Putting isActiveMortgageFirmLookupTableItem: ${JSON.stringify(isActiveMortgageFirmLookupTableItem)}`);
+
+        await LookupTable.putItems([isActiveMortgageFirmLookupTableItem]);        
+    }
+    
     console.log('Exiting');
 };
 
-async function isActiveMortgageFirm(firmReference: string): Promise<boolean> {
+async function getIsActiveMortgageFirm(firmReference: string): Promise<boolean> {
 
     const firmAuthorisation = await LookupTable.getFirmAuthorisation(firmReference);
 
