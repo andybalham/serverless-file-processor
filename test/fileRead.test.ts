@@ -80,11 +80,10 @@ describe('File reading', () => {
                 addressLine6: 'N Yorkshire',
                 postcodeIn: 'RD53',
                 postcodeOut: '1XT',
-                currentAuthorisationStatusCode: 'Authorised'
+                currentAuthorisationStatusCode: 'Authorised',
+                dateStatusLastChanged: '2001-12-01'
             }
         ];
-
-        expectedItems.forEach(i => i.itemHash = LookupTableItem.getItemHash(i));
 
         let actualItems: LookupTableItem[] | null = null;
 
@@ -123,8 +122,6 @@ describe('File reading', () => {
                 ]
             },
         ];
-
-        expectedItems.forEach(i => i.itemHash = LookupTableItem.getItemHash(i));
 
         let actualItems: LookupTableItem[] | null = null;
 
@@ -167,8 +164,6 @@ describe('File reading', () => {
             },
         ];
 
-        expectedItems.forEach(i => i.itemHash = LookupTableItem.getItemHash(i));
-
         let actualItems: LookupTableItem[] | null = null;
 
         await processUpdateMessage(updateMessage, async (LookupTableItems) => {
@@ -203,8 +198,6 @@ describe('File reading', () => {
                 statusEffectiveDate: '2001-12-01'
             },
         ];
-
-        expectedItems.forEach(i => i.itemHash = LookupTableItem.getItemHash(i));
 
         let actualItems: LookupTableItem[] | null = null;
 
