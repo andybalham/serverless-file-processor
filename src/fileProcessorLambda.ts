@@ -11,6 +11,8 @@ import { FileType } from './FileType';
 const s3Client = new S3;
 const sqsClient = new SQS;
 
+const sampleRate = 1000;
+
 export const handle = async (event: SQSEvent): Promise<any> => {
 
     console.log(`event: ${JSON.stringify(event)}`);
@@ -21,7 +23,7 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
         const s3Event = JSON.parse(sqsEventRecord.body) as S3Event | TestEvent;
         
-        const handleUpdate = async (fileHeaderLine: string, updateLines: string[]): Promise<void> => {
+        const handleUpdate = async (fileHeaderLine: string, updateLines: string[], lineNumber: number): Promise<void> => {
 
             const message: FileUpdateMessage = {
                 headerLine: fileHeaderLine,
@@ -33,11 +35,12 @@ export const handle = async (event: SQSEvent): Promise<any> => {
                 QueueUrl: process.env.UNPROCESSED_UPDATE_QUEUE_URL ?? 'undefined'
             };
 
-            console.log(`Sending: ${JSON.stringify(params)}`);
+            // if (lineNumber % sampleRate === 0) console.log(`Sending: ${JSON.stringify(params)}`);
 
-            const result = await sqsClient.sendMessage(params).promise();
+            // const result = 
+            await sqsClient.sendMessage(params).promise();
 
-            console.log(`result: ${JSON.stringify(result)}`);    
+            // if (lineNumber % sampleRate === 0) console.log(`result: ${JSON.stringify(result)}`);    
         };
 
         if ('Records' in s3Event) {
@@ -81,12 +84,13 @@ class TestEvent {
     Event: string
 }
 
-export async function processFileStream(readerStream: Readable, handleLineGroup: (fileHeaderLine: string, lineGroup: string[]) => Promise<void>): Promise<void> {
+export async function processFileStream(readerStream: Readable, handleLineGroup: (fileHeaderLine: string, lineGroup: string[], lineNumber: number) => Promise<void>): Promise<void> {
 
     let fileType: FileType | undefined = undefined;
     let fileHeaderLine = '';
     let currentLineKey: string | null = null;
     let currentLineGroup = new Array<string>();
+    let lineNumber = 0;
 
     const getLineKey = (lineParts: string[]): string | null => {        
         switch (fileType) {
@@ -117,6 +121,8 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
     //     console.error(err);
     //   }
 
+    const lineGroups = new Array<Array<string>>();
+
     const readFileAsync = new Promise((resolve, reject) => {
 
         const lineReader = readline
@@ -126,6 +132,10 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
             });
 
         lineReader.on('line', async (line: string) => {
+
+            lineNumber = lineNumber + 1;
+
+            if (lineNumber % sampleRate === 0) console.log(`Processing line number: ${lineNumber}`);
 
             const lineParts = parseLine(line);
 
@@ -153,7 +163,10 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
                 currentLineGroup = [line];
 
                 if (previousLineGroup.length > 0) {
-                    await handleLineGroup(fileHeaderLine, previousLineGroup);
+                    if (lineNumber % sampleRate === 0) console.log(`Handling group ending at: ${lineNumber}`);
+                    // await handleLineGroup(fileHeaderLine, previousLineGroup, lineNumber);
+                    lineGroups.push(previousLineGroup);
+                    if (lineNumber % sampleRate === 0) console.log(`HANDLED GROUP ENDING AT: ${lineNumber}`);
                 }
             }
         });
@@ -163,7 +176,10 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
             console.log('closed');
 
             if (currentLineGroup.length > 0) {
-                await handleLineGroup(fileHeaderLine, currentLineGroup);
+                console.log(`Handling group ending at: ${lineNumber}`);
+                // await handleLineGroup(fileHeaderLine, currentLineGroup, lineNumber);
+                lineGroups.push(currentLineGroup);
+                console.log(`HANDLED GROUP ENDING AT: ${lineNumber}`);
             }
     
             resolve();
@@ -178,4 +194,18 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
     }
 
     console.log('done reading!');
+
+    console.log('About to handle the line groups');
+
+    let lineGroupCount = 0;
+    for (const lineGroup of lineGroups) {
+        
+        if (lineGroupCount % sampleRate === 0) console.log('About to await handleLineGroup');
+        await handleLineGroup(fileHeaderLine, lineGroup, lineGroupCount);
+        if (lineGroupCount % sampleRate === 0) console.log('Awaited handleLineGroup');
+
+        lineGroupCount = lineGroupCount + 1;
+    }
+
+    console.log('Line groups handled!');
 }

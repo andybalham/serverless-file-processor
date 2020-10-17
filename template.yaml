@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  serverless-file-processing
+  Firm Lookup Application
   
 Parameters:
   SourceBucket:
@@ -9,7 +9,7 @@ Parameters:
     Default: agb-app-source
   ApplicationName:
     Type: String
-    Default: serverless-file-processing
+    Default: firmlkup
   ApiStageName:
     Type: String
     Default: dev
@@ -20,10 +20,8 @@ Parameters:
     AllowedValues: [true, false]
     Default: true
 
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
-    ReservedConcurrentExecutions: 10
     Runtime: nodejs12.x
     Timeout: 3
     CodeUri:
@@ -31,23 +29,13 @@ Globals:
       Key: !Sub ${ApplicationName}/lambda.zip
   
 Resources:
-    
-  FileBucket:
-    Type: AWS::S3::Bucket
-    DependsOn: UnprocessedFileQueue
-    Properties: 
-      BucketName: !Sub ${ApplicationName}-file-bucket
-      NotificationConfiguration:
-        QueueConfigurations:
-        - Event: 's3:ObjectCreated:*'
-          Queue: !GetAtt UnprocessedFileQueue.Arn
 
   UnprocessedFileQueue:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub ${ApplicationName}-unprocessed-file-queue
       ReceiveMessageWaitTimeSeconds: 20
-      VisibilityTimeout: 360
+      VisibilityTimeout: 3600
 
   UnprocessedFileQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -64,25 +52,35 @@ Resources:
             Resource: !GetAtt UnprocessedFileQueue.Arn
             Principal:  
               Service: s3.amazonaws.com
-
-  FailedFileUpdateQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      QueueName: !Sub ${ApplicationName}-failed-file-update-queue
-      ReceiveMessageWaitTimeSeconds: 20
-      VisibilityTimeout: 18
+    
+  FileBucket:
+    Type: AWS::S3::Bucket
+    DependsOn: UnprocessedFileQueue
+    Properties: 
+      BucketName: !Sub ${ApplicationName}-file-bucket
+      NotificationConfiguration:
+        QueueConfigurations:
+        - Event: 's3:ObjectCreated:*'
+          Queue: !GetAtt UnprocessedFileQueue.Arn
 
   UnprocessedFileUpdateQueue:
     Type: AWS::SQS::Queue
     DependsOn:
-      - FailedFileUpdateQueue
+      - UnprocessedFileUpdateDLQ
     Properties:
       QueueName: !Sub ${ApplicationName}-unprocessed-file-update-queue
       ReceiveMessageWaitTimeSeconds: 20
       VisibilityTimeout: 60
       RedrivePolicy:
-        deadLetterTargetArn: !GetAtt FailedFileUpdateQueue.Arn
+        deadLetterTargetArn: !GetAtt UnprocessedFileUpdateDLQ.Arn
         maxReceiveCount: 1
+
+  UnprocessedFileUpdateDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${ApplicationName}-unprocessed-file-update-dlq
+      ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 18
 
   FileProcessorFunction:
     Type: AWS::Serverless::Function
@@ -93,7 +91,7 @@ Resources:
     Properties:
       FunctionName: !Sub ${ApplicationName}-file-processor-function
       Handler: fileProcessorLambda.handle
-      Timeout: 60
+      Timeout: 600
       Environment:
         Variables:
           UNPROCESSED_UPDATE_QUEUE_URL: !Ref UnprocessedFileUpdateQueue
@@ -201,7 +199,9 @@ Resources:
           Type: DynamoDB
           Properties:
             Stream: !GetAtt LookupTable.StreamArn
-            Enabled: !Ref EnableSQS
+            # TODO Enable lookup table events
+            # Enabled: !Ref EnableSQS
+            Enabled: false
             MaximumRetryAttempts: 0
             StartingPosition: TRIM_HORIZON
 
@@ -211,6 +211,16 @@ Resources:
       QueueName: !Sub ${ApplicationName}-iterator-update-queue
       ReceiveMessageWaitTimeSeconds: 20
       VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt IteratorUpdateDLQ.Arn
+        maxReceiveCount: 1
+
+  IteratorUpdateDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${ApplicationName}-iterator-update-dlq
+      ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 18
 
   IteratorUpdateQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -270,6 +280,7 @@ Resources:
     Properties:
       FunctionName: !Sub ${ApplicationName}-iterator-update-processor-function
       Handler: iteratorUpdateProcessorLambda.handle
+      ReservedConcurrentExecutions: 10
       Timeout: 10
       Policies:
         - SQSPollerPolicy:
@@ -293,6 +304,16 @@ Resources:
       QueueName: !Sub ${ApplicationName}-permissions-changed-queue
       ReceiveMessageWaitTimeSeconds: 20
       VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt PermissionsChangedDLQ.Arn
+        maxReceiveCount: 1
+
+  PermissionsChangedDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${ApplicationName}-permissions-changed-dlq
+      ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 18
 
   PermissionsChangedQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -328,6 +349,7 @@ Resources:
     Properties:
       FunctionName: !Sub ${ApplicationName}-permission-changed-processor-function
       Handler: permissionsChangedProcessorLambda.handle
+      ReservedConcurrentExecutions: 10
       Timeout: 10
       Policies:
         - SQSPollerPolicy:
@@ -351,6 +373,16 @@ Resources:
       QueueName: !Sub ${ApplicationName}-search-update-queue
       ReceiveMessageWaitTimeSeconds: 20
       VisibilityTimeout: 60
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt SearchUpdateDLQ.Arn
+        maxReceiveCount: 1
+
+  SearchUpdateDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub ${ApplicationName}-search-update-dlq
+      ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 18
 
   SearchUpdateQueuePolicy:
     Type: AWS::SQS::QueuePolicy
@@ -381,33 +413,10 @@ Resources:
       Protocol: sqs
       TopicArn: !Ref LookupTableEventTopic
 
-  # SearchTable:
-  #   Type: AWS::DynamoDB::Table
-  #   Properties: 
-  #     TableName: !Sub ${ApplicationName}-search-table
-  #     ProvisionedThroughput: 
-  #       ReadCapacityUnits: 5
-  #       WriteCapacityUnits: 5
-  #     AttributeDefinitions: 
-  #       - 
-  #         AttributeName: searchType
-  #         AttributeType: S
-  #       - 
-  #         AttributeName: sortKey
-  #         AttributeType: S
-  #     KeySchema: 
-  #       - 
-  #         AttributeName: searchType
-  #         KeyType: HASH
-  #       - 
-  #         AttributeName: sortKey
-  #         KeyType: RANGE
-
   SearchUpdateProcessorFunction:
     Type: AWS::Serverless::Function
     DependsOn:
       - SearchUpdateQueue
-      # - SearchTable
     Properties:
       FunctionName: !Sub ${ApplicationName}-search-update-processor-function
       Handler: searchUpdateProcessorLambda.handle
@@ -415,11 +424,6 @@ Resources:
       Policies:
         - SQSPollerPolicy:
             QueueName: !GetAtt SearchUpdateQueue.QueueName
-        # - DynamoDBCrudPolicy:
-        #     TableName: !Ref SearchTable
-      # Environment:
-      #   Variables:
-      #     LOOKUP_TABLE_NAME: !Ref SearchTable
       Events:
         UnprocessedUpdateEvent:
           Type: SQS
