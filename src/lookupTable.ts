@@ -23,6 +23,10 @@ export async function putItems(databaseItems: LookupTableItem[]): Promise<void> 
 
     // TODO 19Sep20: Avoid using transactions for single updates
     
+    if (databaseItems.length === 0) {
+        return;
+    }
+
     const batchGetParams: DocumentClient.BatchGetItemInput = { RequestItems: {}};
     batchGetParams.RequestItems[tableName()] = { 
         Keys: databaseItems.map(item => {

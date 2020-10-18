@@ -1,5 +1,5 @@
 import { createReadStream } from 'fs';
-import { processFileStream } from '../src/fileProcessorLambda';
+import { processFile } from '../src/fileProcessorLambda';
 import { processUpdateMessage } from '../src/fileUpdateProcessorLambda';
 import { expect } from 'chai';
 import { FileUpdateMessage } from '../src/FileUpdateMessage';
@@ -51,7 +51,7 @@ describe('File reading', () => {
                 console.log(`Pushed lines: ${lines.length}, first: ${lines[0]}`);
             };
     
-            await processFileStream(readerStream, handleLines);
+            await processFile(readerStream, handleLines);
     
             expect(actualHeader).to.equal(theory.expectedHeader);
             expect(actualLineGroups.length).to.equal(theory.expectedGroupCount);

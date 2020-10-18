@@ -2,9 +2,9 @@ import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { FileUpdateMessage } from './FileUpdateMessage';
 import { FileType } from './FileType';
 import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNamesLookupTableItem, AlternativeFirmName, FirmPermissionsLookupTableItem, FirmPermission, FirmAppointedRepresentativeLookupTableItem, FirmPrincipalLookupTableItem } from './LookupTableItems';
-import { parseLine } from './parsing';
 import * as LookupTable from './lookupTable';
 import dayjs from 'dayjs';
+import S3, { GetObjectRequest } from 'aws-sdk/clients/s3';
 
 export const handle = async (event: SQSEvent): Promise<any> => {
 
@@ -25,13 +25,30 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 };
 
 export async function processUpdateMessage(updateMessage: FileUpdateMessage, updater: (databaseItems: LookupTableItem[]) => Promise<void>): Promise<void> {    
-    const databaseItems = getDatabaseItems(updateMessage);
+    const databaseItems = await getDatabaseItems(updateMessage);
     await updater(databaseItems);
 }
 
-function getDatabaseItems(updateMessage: FileUpdateMessage): LookupTableItem[] {
+const s3Client = new S3;
+
+async function getDatabaseItems(updateMessage: FileUpdateMessage): Promise<LookupTableItem[]> {
     
-    const fileType = updateMessage.headerLine.split('|')[1] as FileType;
+    const fileType = updateMessage.fileType;
+
+    const params: GetObjectRequest = {
+        Bucket: updateMessage.fileBucket,
+        Key: updateMessage.fileKey,
+    };
+
+    console.log(`params: ${JSON.stringify(params)}`);
+
+    // const readerStream = s3Client.getObject(params).createReadStream();
+    // const getObjectResult = 
+    await s3Client.getObject(params).promise();
+
+    console.log('getObject awaited');
+
+    const earlyReturn = true; if (earlyReturn) return [];
 
     // TODO 12Sep20: How can we reject the message if we are not able to process it?
 
@@ -66,7 +83,7 @@ function getDatabaseItems(updateMessage: FileUpdateMessage): LookupTableItem[] {
 
 function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<FirmAppointedRepresentativeLookupTableItem | FirmPrincipalLookupTableItem> {
 
-    const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 9));
+    const dataValuesArray = []; //updateMessage.dataLines.map(line => parseLine(line, 9));
 
     const appointmentDataValues = dataValuesArray[0];
 
@@ -94,7 +111,7 @@ function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<Fi
 
 function getFirmPermissionDatabaseItems(updateMessage: FileUpdateMessage): FirmPermissionsLookupTableItem[] {
 
-    const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 8));
+    const dataValuesArray = []; //updateMessage.dataLines.map(line => parseLine(line, 8));
 
     const getFirmPermissions = (dataValuesArray: string[][]): FirmPermission[] => 
         dataValuesArray.map(firmPermissionValues => {
@@ -118,7 +135,7 @@ function getFirmPermissionDatabaseItems(updateMessage: FileUpdateMessage): FirmP
 
 function getAlternativeFirmNameDatabaseItems(updateMessage: FileUpdateMessage): AlternativeFirmNamesLookupTableItem[] {
 
-    const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 8));
+    const dataValuesArray = []; //updateMessage.dataLines.map(line => parseLine(line, 8));
 
     const getAlternativeNames = (dataValuesArray: string[][]): AlternativeFirmName[] => 
         dataValuesArray.map(alternativeNameValues => {
@@ -157,7 +174,7 @@ function getOptionalDateItemValue(dateString: string, attributeName: string): st
 
 function getFirmsMasterListDatabaseItems(updateMessage: FileUpdateMessage): FirmAuthorisationLookupTableItem[] {
 
-    const dataValuesArray = updateMessage.dataLines.map(line => parseLine(line, 29));
+    const dataValuesArray = []; //updateMessage.dataLines.map(line => parseLine(line, 29));
 
     const firmAuthorisationValues = dataValuesArray[0];
 

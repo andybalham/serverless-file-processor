@@ -1,17 +1,16 @@
 import readline from 'readline';
-import { S3 } from 'aws-sdk';
-import { Readable } from 'stream';
 import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { S3Event } from 'aws-lambda';
 import SQS, { SendMessageRequest } from 'aws-sdk/clients/sqs';
-import { FileUpdateMessage } from './FileUpdateMessage';
+import { FileUpdateMessage, LineGroupBlock } from './FileUpdateMessage';
 import { parseLine } from './parsing';
 import { FileType } from './FileType';
+import S3, { GetObjectRequest } from 'aws-sdk/clients/s3';
 
 const s3Client = new S3;
 const sqsClient = new SQS;
 
-const sampleRate = 1000;
+const sampleRate = 10000;
 
 export const handle = async (event: SQSEvent): Promise<any> => {
 
@@ -22,26 +21,6 @@ export const handle = async (event: SQSEvent): Promise<any> => {
         const sqsEventRecord = event.Records[sqsEventRecordIndex];
 
         const s3Event = JSON.parse(sqsEventRecord.body) as S3Event | TestEvent;
-        
-        const handleUpdate = async (fileHeaderLine: string, updateLines: string[], lineNumber: number): Promise<void> => {
-
-            const message: FileUpdateMessage = {
-                headerLine: fileHeaderLine,
-                dataLines: updateLines
-            };
-
-            const params: SendMessageRequest = {
-                MessageBody: JSON.stringify(message),
-                QueueUrl: process.env.UNPROCESSED_UPDATE_QUEUE_URL ?? 'undefined'
-            };
-
-            // if (lineNumber % sampleRate === 0) console.log(`Sending: ${JSON.stringify(params)}`);
-
-            // const result = 
-            await sqsClient.sendMessage(params).promise();
-
-            // if (lineNumber % sampleRate === 0) console.log(`result: ${JSON.stringify(result)}`);    
-        };
 
         if ('Records' in s3Event) {
             
@@ -49,23 +28,14 @@ export const handle = async (event: SQSEvent): Promise<any> => {
 
                 const s3EventRecord = s3Event.Records[s3EventRecordIndex];
 
-                if (s3EventRecord.eventName === 'ObjectCreated:Put') {
+                if (s3EventRecord.eventName.startsWith('ObjectCreated:')) {
 
                     const bucket = s3EventRecord.s3.bucket.name;
                     const key = decodeURIComponent(s3EventRecord.s3.object.key.replace(/\+/g, ' '));
 
-                    const params = {
-                        Bucket: bucket,
-                        Key: key,
-                    };
-
-                    console.log(`params: ${JSON.stringify(params)}`);
-                
-                    const s3ReadStream = s3Client.getObject(params).createReadStream();
-
-                    await processFileStream(s3ReadStream, handleUpdate);
+                    await processFile(bucket, key);
                                                         
-                    console.log('Processed file stream');
+                    console.log('Processed file');
 
                 } else {
                     console.warn(`Unexpected eventName: ${s3EventRecord.eventName}`);
@@ -84,10 +54,18 @@ class TestEvent {
     Event: string
 }
 
-export async function processFileStream(readerStream: Readable, handleLineGroup: (fileHeaderLine: string, lineGroup: string[], lineNumber: number) => Promise<void>): Promise<void> {
+export async function processFile(fileBucket: string, fileKey: string): Promise<void> {
+
+    const params: GetObjectRequest = {
+        Bucket: fileBucket,
+        Key: fileKey,
+    };
+
+    console.log(`params: ${JSON.stringify(params)}`);
+
+    const readerStream = s3Client.getObject(params).createReadStream();
 
     let fileType: FileType | undefined = undefined;
-    let fileHeaderLine = '';
     let currentLineKey: string | null = null;
     let currentLineGroup = new Array<string>();
     let lineNumber = 0;
@@ -121,9 +99,12 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
     //     console.error(err);
     //   }
 
-    const lineGroups = new Array<Array<string>>();
+    const lineGroupBlocks = new Array<LineGroupBlock>();
 
-    const readFileAsync = new Promise((resolve, reject) => {
+    let startLineKey: string | null = null;
+    let lineGroupBlockCount = 0;
+
+    const readFileAsync = new Promise(resolve => {
 
         const lineReader = readline
             .createInterface({
@@ -141,7 +122,6 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
 
             if (lineParts[0] === 'Header') {
                 fileType = lineParts[1] as FileType;
-                fileHeaderLine = line;
                 return;                
             }
 
@@ -162,11 +142,24 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
                 currentLineKey = lineKey;
                 currentLineGroup = [line];
 
+                if (startLineKey === null) {
+                    startLineKey = lineKey;
+                }
+                
                 if (previousLineGroup.length > 0) {
-                    if (lineNumber % sampleRate === 0) console.log(`Handling group ending at: ${lineNumber}`);
-                    // await handleLineGroup(fileHeaderLine, previousLineGroup, lineNumber);
-                    lineGroups.push(previousLineGroup);
-                    if (lineNumber % sampleRate === 0) console.log(`HANDLED GROUP ENDING AT: ${lineNumber}`);
+
+                    lineGroupBlockCount += 1;
+
+                    if (lineGroupBlockCount === LineGroupBlock.Size) {
+                        
+                        lineGroupBlocks.push({
+                            startLineKey: startLineKey,
+                            endLineKey: lineKey
+                        });
+
+                        startLineKey = lineKey;
+                        lineGroupBlockCount = 0;
+                    }
                 }
             }
         });
@@ -176,12 +169,12 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
             console.log('closed');
 
             if (currentLineGroup.length > 0) {
-                console.log(`Handling group ending at: ${lineNumber}`);
-                // await handleLineGroup(fileHeaderLine, currentLineGroup, lineNumber);
-                lineGroups.push(currentLineGroup);
-                console.log(`HANDLED GROUP ENDING AT: ${lineNumber}`);
+                lineGroupBlocks.push({
+                    startLineKey: startLineKey,
+                    endLineKey: null
+                });
             }
-    
+
             resolve();
         });
     });
@@ -195,17 +188,22 @@ export async function processFileStream(readerStream: Readable, handleLineGroup:
 
     console.log('done reading!');
 
-    console.log('About to handle the line groups');
+    for (const lineGroupBlock of lineGroupBlocks) {
 
-    let lineGroupCount = 0;
-    for (const lineGroup of lineGroups) {
-        
-        if (lineGroupCount % sampleRate === 0) console.log('About to await handleLineGroup');
-        await handleLineGroup(fileHeaderLine, lineGroup, lineGroupCount);
-        if (lineGroupCount % sampleRate === 0) console.log('Awaited handleLineGroup');
+        const message: FileUpdateMessage = {
+            fileBucket: fileBucket,
+            fileKey: fileKey,
+            fileType: fileType,
+            lineGroupBlock: lineGroupBlock
+        };
 
-        lineGroupCount = lineGroupCount + 1;
+        const params: SendMessageRequest = {
+            MessageBody: JSON.stringify(message),
+            QueueUrl: process.env.UNPROCESSED_UPDATE_QUEUE_URL ?? 'undefined'
+        };
+
+        await sqsClient.sendMessage(params).promise();
+
+        console.log(`Sent message: ${JSON.stringify(message)}`);
     }
-
-    console.log('Line groups handled!');
 }
