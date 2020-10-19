@@ -9,7 +9,7 @@ export class FileUpdateMessage {
 
 export class LineGroupBlock {
 
-    static readonly Size = 1000;
+    static readonly Size = 600;
 
     startLineKey: string | null; 
     endLineKey: string | null;

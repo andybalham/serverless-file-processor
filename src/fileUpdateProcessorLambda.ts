@@ -1,3 +1,4 @@
+import readline from 'readline';
 import { SQSEvent } from 'aws-lambda/trigger/sqs';
 import { FileUpdateMessage } from './FileUpdateMessage';
 import { FileType } from './FileType';
@@ -5,6 +6,8 @@ import { LookupTableItem, FirmAuthorisationLookupTableItem, AlternativeFirmNames
 import * as LookupTable from './lookupTable';
 import dayjs from 'dayjs';
 import S3, { GetObjectRequest } from 'aws-sdk/clients/s3';
+import { parseLine } from './parsing';
+import { Readable } from 'stream';
 
 export const handle = async (event: SQSEvent): Promise<any> => {
 
@@ -40,50 +43,50 @@ async function getDatabaseItems(updateMessage: FileUpdateMessage): Promise<Looku
         Key: updateMessage.fileKey,
     };
 
-    console.log(`params: ${JSON.stringify(params)}`);
-
-    // const readerStream = s3Client.getObject(params).createReadStream();
-    // const getObjectResult = 
-    await s3Client.getObject(params).promise();
-
-    console.log('getObject awaited');
-
-    const earlyReturn = true; if (earlyReturn) return [];
+    const readerStream = s3Client.getObject(params).createReadStream();
 
     // TODO 12Sep20: How can we reject the message if we are not able to process it?
 
-    let databaseItems: LookupTableItem[];
+    const dataLineGroups = 
+        await getDataLineGroups(updateMessage.lineGroupBlock.startLineKey, updateMessage.lineGroupBlock.endLineKey, readerStream);
 
-    switch (fileType) {
+    console.log(`dataLineGroups.length: ${dataLineGroups.length}`);
+    
+    let databaseItems = new Array<LookupTableItem>();
 
-    case FileType.FirmsMasterList:
-        databaseItems = getFirmsMasterListDatabaseItems(updateMessage);
-        break;
+    for (const dataLines of dataLineGroups) {
+        
+        switch (fileType) {
+
+        case FileType.FirmsMasterList:
+            databaseItems = databaseItems.concat(getFirmsMasterListDatabaseItems(dataLines));
+            break;
     
-    case FileType.AlternativeFirmName:
-        databaseItems = getAlternativeFirmNameDatabaseItems(updateMessage);
-        break;
+        case FileType.AlternativeFirmName:
+            databaseItems = databaseItems.concat(databaseItems = getAlternativeFirmNameDatabaseItems(dataLines));
+            break;
     
-    case FileType.FirmPermission:
-        databaseItems = getFirmPermissionDatabaseItems(updateMessage);
-        break;
+        case FileType.FirmPermission:
+            databaseItems = databaseItems.concat(databaseItems = getFirmPermissionDatabaseItems(dataLines));
+            break;
     
-    case FileType.Appointment:
-        databaseItems = getAppointmentDatabaseItems(updateMessage);
-        break;
+        case FileType.Appointment:
+            databaseItems = databaseItems.concat(databaseItems = getAppointmentDatabaseItems(dataLines));
+            break;
                 
-    default:
-        throw new Error(`Unhandled file type: ${fileType}`);
+        default:
+            throw new Error(`Unhandled file type: ${fileType}`);
+        }
     }
 
-    console.log(`${fileType},${JSON.stringify(databaseItems)}`);
+    console.log(`databaseItems.length: ${databaseItems.length}`);
 
     return databaseItems;
 }
 
-function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<FirmAppointedRepresentativeLookupTableItem | FirmPrincipalLookupTableItem> {
+function getAppointmentDatabaseItems(dataLines: string[]): Array<FirmAppointedRepresentativeLookupTableItem | FirmPrincipalLookupTableItem> {
 
-    const dataValuesArray = []; //updateMessage.dataLines.map(line => parseLine(line, 9));
+    const dataValuesArray = dataLines.map(line => parseLine(line, 9));
 
     const appointmentDataValues = dataValuesArray[0];
 
@@ -109,9 +112,9 @@ function getAppointmentDatabaseItems(updateMessage: FileUpdateMessage): Array<Fi
     return [firmAppointedRepresentative, firmPrincipal];
 }
 
-function getFirmPermissionDatabaseItems(updateMessage: FileUpdateMessage): FirmPermissionsLookupTableItem[] {
+function getFirmPermissionDatabaseItems(dataLines: string[]): FirmPermissionsLookupTableItem[] {
 
-    const dataValuesArray = []; //updateMessage.dataLines.map(line => parseLine(line, 8));
+    const dataValuesArray = dataLines.map(line => parseLine(line, 8));
 
     const getFirmPermissions = (dataValuesArray: string[][]): FirmPermission[] => 
         dataValuesArray.map(firmPermissionValues => {
@@ -133,9 +136,9 @@ function getFirmPermissionDatabaseItems(updateMessage: FileUpdateMessage): FirmP
     return [firmPermissionsDatabaseItem];
 }
 
-function getAlternativeFirmNameDatabaseItems(updateMessage: FileUpdateMessage): AlternativeFirmNamesLookupTableItem[] {
+function getAlternativeFirmNameDatabaseItems(dataLines: string[]): AlternativeFirmNamesLookupTableItem[] {
 
-    const dataValuesArray = []; //updateMessage.dataLines.map(line => parseLine(line, 8));
+    const dataValuesArray = dataLines.map(line => parseLine(line, 8));
 
     const getAlternativeNames = (dataValuesArray: string[][]): AlternativeFirmName[] => 
         dataValuesArray.map(alternativeNameValues => {
@@ -172,9 +175,9 @@ function getOptionalDateItemValue(dateString: string, attributeName: string): st
     return (dateString === '') ? undefined : getDateItemValue(dateString, attributeName);
 }
 
-function getFirmsMasterListDatabaseItems(updateMessage: FileUpdateMessage): FirmAuthorisationLookupTableItem[] {
+function getFirmsMasterListDatabaseItems(dataLines: string[]): FirmAuthorisationLookupTableItem[] {
 
-    const dataValuesArray = []; //updateMessage.dataLines.map(line => parseLine(line, 29));
+    const dataValuesArray = dataLines.map(line => parseLine(line, 29));
 
     const firmAuthorisationValues = dataValuesArray[0];
 
@@ -201,3 +204,96 @@ function getStringItemValue(fileValue: string): string | undefined {
     return fileValue === '' ? undefined : fileValue;
 }
 
+async function getDataLineGroups(startLineKey: string | null, endLineKey: string | null, readerStream: Readable): Promise<Array<Array<string>>> {
+
+    const getLineKey = (lineParts: string[]): string | null => {        
+        switch (fileType) {
+        case FileType.Appointment:
+        case FileType.FirmPermission:
+            return `${lineParts[0]}|${lineParts[1]}`;
+        default:
+            return lineParts[0];
+        }
+    };
+
+    let fileType: FileType | undefined = undefined;
+    let currentLineKey: string | null = null;
+    let currentLineGroup = new Array<string>();
+    let lineNumber = 0;
+    let isInRange = false;
+
+    const dataLineGroups = Array<Array<string>>();
+
+    const readFileAsync = new Promise(resolve => {
+
+        const lineReader = readline
+            .createInterface({
+                input: readerStream,
+                terminal: false
+            });
+
+        lineReader.on('line', async (line: string) => {
+
+            lineNumber = lineNumber + 1;
+
+            const lineParts = parseLine(line);
+
+            if (lineParts[0] === 'Header') {
+                fileType = lineParts[1] as FileType;
+                return;                
+            }
+
+            if (lineParts[0] === 'Footer') {
+                return;                
+            }
+
+            const lineKey = getLineKey(lineParts);
+
+            if (lineKey === startLineKey) {
+                isInRange = true;
+            }
+
+            if (!isInRange) {
+                return;
+            }
+
+            if (lineKey === currentLineKey) {
+
+                currentLineGroup.push(line);
+
+            } else {
+
+                if (currentLineGroup.length > 0) {
+                    dataLineGroups.push(currentLineGroup);
+                }
+
+                currentLineKey = lineKey;    
+                currentLineGroup = (lineKey !== endLineKey) ? [line] : [];
+
+                if (lineKey === endLineKey) {
+                    isInRange = false;
+                }
+            }
+        });
+
+        lineReader.on('close', async () => {
+
+            console.log('closed');
+
+            if (currentLineGroup.length > 0) {
+                dataLineGroups.push(currentLineGroup);
+            }
+
+            resolve();
+        });
+    });
+
+    try {
+        await readFileAsync;
+    }
+    catch(err) {
+        console.log('an error has occurred');
+    }
+
+    return dataLineGroups;
+}

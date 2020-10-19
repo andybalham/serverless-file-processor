@@ -13,57 +13,50 @@ export async function putItems(databaseItems: LookupTableItem[]): Promise<void> 
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#transactWrite-property
     // https://www.alexdebrie.com/posts/dynamodb-transactions/
     // https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_TransactWriteItems.html
-
-    /*
-    For optimistic locking:
-    * Get the item
-    * If the item exists then put with a condition and a version increment
-    * If the item doesn't exist then put with a condition of ??? "attribute_not_exists(Id)"
-    */
-
-    // TODO 19Sep20: Avoid using transactions for single updates
     
-    if (databaseItems.length === 0) {
-        return;
-    }
+    const batchSize = 10;
+    let batchCount = 0;
+    let batchStart = batchCount * batchSize;
+    let batchEnd = (batchCount + 1) * batchSize;
+    let databaseItemBatch = databaseItems.slice(batchStart, batchEnd);
 
-    const batchGetParams: DocumentClient.BatchGetItemInput = { RequestItems: {}};
-    batchGetParams.RequestItems[tableName()] = { 
-        Keys: databaseItems.map(item => {
-            return { firmReference: item.firmReference, itemType: item.itemType };
-        }),
-        AttributesToGet: [
-            'firmReference', 'itemType', 'itemHash'
-        ]
-    };
+    while (databaseItemBatch.length > 0) {
+
+        const batchGetParams: DocumentClient.BatchGetItemInput = { RequestItems: {}};
+        batchGetParams.RequestItems[tableName()] = { 
+            Keys: databaseItemBatch.map(item => {
+                return { firmReference: item.firmReference, itemType: item.itemType };
+            }),
+            AttributesToGet: [
+                'firmReference', 'itemType', 'itemHash'
+            ]
+        };
     
-    const batchGetResponse = await dynamoDbClient.batchGet(batchGetParams).promise();
+        const batchGetResponse = await dynamoDbClient.batchGet(batchGetParams).promise();
 
-    if (batchGetResponse.Responses === undefined) throw new Error('batchGetResponse.Responses === undefined');
+        if (batchGetResponse.Responses === undefined) throw new Error('batchGetResponse.Responses === undefined');
 
-    const tableResponses = batchGetResponse.Responses[tableName()];
+        const tableResponses = batchGetResponse.Responses[tableName()];
 
-    const currentItemHashes = new Map<string, string | undefined>();    
-    tableResponses
-        .forEach((item, index) => 
-        {
-            const itemHashKey = getItemHashKey(item as ILookupTableItem);
-            currentItemHashes.set(itemHashKey, item.itemHash);
-        });
-
-    console.log(`currentItemHashes: ${JSON.stringify(Array.from(currentItemHashes.entries()))}`);
+        const currentItemHashes = new Map<string, string | undefined>();    
+        tableResponses
+            .forEach((item, index) => 
+            {
+                const itemHashKey = getItemHashKey(item as ILookupTableItem);
+                currentItemHashes.set(itemHashKey, item.itemHash);
+            });
     
-    databaseItems.forEach(item => LookupTableItem.setItemHash(item));
+        databaseItemBatch.forEach(item => LookupTableItem.setItemHash(item));
     
-    const putItems = databaseItems.map(item => { 
+        const putItems = databaseItemBatch.map(item => { 
 
-        const itemHashKey = getItemHashKey(item);
-        const currentItemHash = currentItemHashes.get(itemHashKey);
+            const itemHashKey = getItemHashKey(item);
+            const currentItemHash = currentItemHashes.get(itemHashKey);
 
-        let putItem: any;
-        if (currentItemHash === undefined) {
+            let putItem: any;
+            if (currentItemHash === undefined) {
         
-            putItem = 
+                putItem = 
                 {
                     Put: {
                         TableName: tableName(),
@@ -73,12 +66,12 @@ export async function putItems(databaseItems: LookupTableItem[]): Promise<void> 
                     }
                 };
 
-        } else {
-
-            if (item.itemHash === currentItemHash) {
-                console.log(`item.itemHash === currentItemHash, so skipping item ${itemHashKey}`);
             } else {
-                putItem = 
+
+                if (item.itemHash === currentItemHash) {
+                    // console.log(`item.itemHash === currentItemHash, so skipping item ${itemHashKey}`);
+                } else {
+                    putItem = 
                     {
                         Put: {
                             TableName: tableName(),
@@ -88,35 +81,39 @@ export async function putItems(databaseItems: LookupTableItem[]): Promise<void> 
                             ReturnValuesOnConditionCheckFailure: 'NONE'
                         }
                     };    
+                }
+            }
+
+            return putItem;
+        });
+
+        const definedPutItems = putItems.filter(item => item !== undefined);
+
+        if (definedPutItems.length > 0) {
+
+            const params = {
+                TransactItems: definedPutItems
+            };
+
+            try {
+        
+                await dynamoDbClient.transactWrite(params).promise();
+
+            } catch (error) {
+        
+                if (error instanceof Error) {            
+                    console.error(`error.message: ${error.message}`);
+                } else {
+                    throw error;
+                }
             }
         }
 
-        return putItem;
-    });
-
-    const definedPutItems = putItems.filter(item => item !== undefined);
-
-    if (definedPutItems.length === 0) {
-        return;
+        batchCount += 1;
+        batchStart = batchCount * batchSize;
+        batchEnd = (batchCount + 1) * batchSize;
+        databaseItemBatch = databaseItems.slice(batchStart, batchEnd);
     }
-
-    const params = {
-        TransactItems: definedPutItems
-    };
-
-    try {
-        
-        await dynamoDbClient.transactWrite(params).promise();
-
-    } catch (error) {
-        
-        if (error instanceof Error) {            
-            console.error(`error.message: ${error.message}`);
-        } else {
-            throw error;
-        }
-    }
-    
 
     function getItemHashKey(item: ILookupTableItem): string {
         return `${item.firmReference}||${item.itemType}`;
